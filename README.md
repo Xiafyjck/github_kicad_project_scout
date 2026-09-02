@@ -19,6 +19,8 @@ Conventions for contributors and coding agents live in [AGENTS.md](AGENTS.md).
 
 7. **Repo activity stats** `05_github_fetch_repo_stats.py`. Reads the candidate DB read-only and asks the GitHub GraphQL API, 25 repos per query, for default-branch commit count, PR count total and merged, issue count, fork/archived/disabled flags, parent, pushedAt, stars, and more. Raw responses are cached by query + variables and one row per repo lands in `repo_stats` inside `data/cache/github_repo_stats/state.sqlite`. Feeds the shortlist for the improvement-history stage.
 
+8. **Project improvement history** `06_github_fetch_repo_history.py`. Reads candidates, filter, and stats DBs read-only and walks, for every candidate repo, four REST listings with all pages: `commits?path=<project_dir>` per qualified project dir (whole-repo history when the repo has none), every PR, the changed files of every PR, and every issue. Raw pages are cached by URL + params in `data/cache/github_repo_history/state.sqlite`; `listing_pages` indexes them by repo, kind, subject, page. Shortlisted and qualified repos are queued first.
+
 Run the scripts in numeric order:
 
 ```bash
@@ -28,6 +30,7 @@ uv run scripts/02_github_fetch_trees.py
 uv run scripts/03_filter_kicad_projects.py
 uv run scripts/04_release_github_trees.py
 uv run scripts/05_github_fetch_repo_stats.py
+uv run scripts/06_github_fetch_repo_history.py
 ```
 
 Every script resumes from its own SQLite cache. Rerunning the whole chain against a complete cache makes no API calls.
@@ -47,7 +50,8 @@ pcb_project_scout/
 │   ├── 02_github_fetch_trees.py      # fetch file trees (network, raw responses only)
 │   ├── 03_filter_kicad_projects.py   # local first pass (local)
 │   ├── 04_release_github_trees.py    # release export (local)
-│   └── 05_github_fetch_repo_stats.py # repo activity stats via GraphQL (network)
+│   ├── 05_github_fetch_repo_stats.py # repo activity stats via GraphQL (network)
+│   └── 06_github_fetch_repo_history.py # commits / PRs / PR files / issues per repo (network)
 └── data/             # gitignored; caches stay local, releases go to GitHub Releases
     ├── cache/<stage>/state.sqlite    # per-stage resumable cache; upstream DBs are read-only downstream
     ├── releases/<date>/              # release artifacts, unpacked
@@ -75,8 +79,8 @@ pcb_project_scout/
 - [ ] Filter repos that ship 3D models
 
 ### Further filtering
-- [ ] Repo activity stats, all ~40k repos. GraphQL returns default-branch commit count, PR count total and merged, issue count, isFork, isArchived, pushedAt, stars. About 400 to 800 requests, one token finishes within an hour. Caching unchanged: raw JSON keyed by query + variables in SQLite.
-- [ ] For shortlisted repos (for example merged PR >= 1, or commits >= 5 and issues >= 1): for every qualified project dir fetch `commits?path=<project_dir>` to get the commit sequence touching that project; for every PR fetch `files` to see whether kicad_pcb / kicad_sch changed; full issue list. REST API, cost scales with the shortlist.
+- [x] Repo activity stats, all ~40k repos (done 2026-09-03: 39895 fetched, 7 not found, 1597 GraphQL queries). GraphQL returns default-branch commit count, PR count total and merged, issue count, isFork, isArchived, pushedAt, stars. About 400 to 800 requests, one token finishes within an hour. Caching unchanged: raw JSON keyed by query + variables in SQLite.
+- [ ] Improvement history for every candidate repo (started 2026-09-03, shortlisted and qualified repos first): for every qualified project dir fetch `commits?path=<project_dir>` to get the commit sequence touching that project; for every PR fetch `files` to see whether kicad_pcb / kicad_sch changed; full issue list. REST API, cost scales with the shortlist.
 - [ ] Link commits / PRs / issues to project dirs and produce an "improvement event" table: tree sha before and after, changed files, PR or issue text. Benchmark tasks are picked from here: the before state is the input, the after state is the reference answer.
 - [ ] Publish a release
 
