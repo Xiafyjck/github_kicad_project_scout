@@ -26,7 +26,7 @@ GITHUB_CODE_SEARCH_MAX_FILE_SIZE_BYTES = 384 * 1024
 
 # Collection policy: these values are this script's current choices.
 # File suffixes to search, run one after another, each with its own cache. Add a suffix here.
-SUFFIXES = ("kicad_pro",)
+SUFFIXES = ("kicad_pro", "kicad_pcb", "kicad_sch", "sch")
 FIRST_SPLIT_SIZE = 17398
 SEARCH_REQUEST_INTERVAL_SECONDS = 6.2
 MAX_SERVER_ERROR_RETRIES = 4
@@ -188,21 +188,29 @@ def collect_kicad_repos(raw_suffix: str) -> dict[str, Any]:
             )
         return db
 
-    def check_tokens(tokens: list[str]) -> None:
-        # Startup probe: stop immediately if the API version, a token, or the network is broken.
+    def check_tokens(tokens: list[str]) -> list[tuple[int, str]]:
+        # Startup probe: drop tokens whose account is suspended or otherwise rejected (observed: HTTP 403
+        # "Your account was suspended"), keep going with the rest, stop only if none is usable.
         # This avoids writing the same failure row once per size query.
+        ready_tokens = []
         for token_no, token in enumerate(tokens, start=1):
             with httpx.Client(base_url=GITHUB_API_BASE, headers=github_headers(token), timeout=30) as client:
                 response = client.get(GITHUB_RATE_LIMIT_ENDPOINT)
                 if response.status_code >= 400:
                     message = github_error_message(response)
-                    raise RuntimeError(f"token#{token_no} startup check failed: HTTP {response.status_code} {message}")
+                    print(f"token#{token_no} skipped startup HTTP {response.status_code}: {message[:160]}", flush=True)
+                    continue
 
                 data = response.json()
                 code_search = data.get("resources", {}).get("code_search", {})
                 remaining = code_search.get("remaining", "?")
                 limit = code_search.get("limit", "?")
                 print(f"token#{token_no} ready code_search_remaining={remaining}/{limit}", flush=True)
+                ready_tokens.append((token_no, token))
+
+        if not ready_tokens:
+            raise RuntimeError("no usable GitHub tokens after startup check")
+        return ready_tokens
 
     def load_start_bins() -> list[dict[str, Any]]:
         def size_bin_from_query(query: str) -> dict[str, Any]:
@@ -319,8 +327,9 @@ def collect_kicad_repos(raw_suffix: str) -> dict[str, Any]:
     try:
         tokens = load_tokens()
         bins = load_start_bins()
+        ready_tokens = list(enumerate(tokens, start=1))
         if bins:
-            check_tokens(tokens)
+            ready_tokens = check_tokens(tokens)
         work_queue: queue.Queue[dict[str, Any] | None] = queue.Queue()
         for size_bin in bins:
             work_queue.put(size_bin)
@@ -635,10 +644,10 @@ def collect_kicad_repos(raw_suffix: str) -> dict[str, Any]:
                     finally:
                         work_queue.task_done()
 
-        print(f"start suffix={suffix} todo_bins={len(bins)} tokens={len(tokens)} db={db_path}", flush=True)
+        print(f"start suffix={suffix} todo_bins={len(bins)} tokens={len(ready_tokens)} db={db_path}", flush=True)
 
-        with ThreadPoolExecutor(max_workers=len(tokens)) as pool:
-            futures = [pool.submit(collect_with_token, token_no, token) for token_no, token in enumerate(tokens, start=1)]
+        with ThreadPoolExecutor(max_workers=len(ready_tokens)) as pool:
+            futures = [pool.submit(collect_with_token, token_no, token) for token_no, token in ready_tokens]
             try:
                 while work_queue.unfinished_tasks > 0:
                     for future in futures:
@@ -662,6 +671,7 @@ def collect_kicad_repos(raw_suffix: str) -> dict[str, Any]:
             "github_code_search_max_file_size_bytes": GITHUB_CODE_SEARCH_MAX_FILE_SIZE_BYTES,
             "todo_bin_count_at_start": len(bins),
             "token_count": len(tokens),
+            "ready_token_count": len(ready_tokens),
             "page_count": db.execute("select count(*) from pages").fetchone()[0],
             "query_count": db.execute("select count(*) from query_status").fetchone()[0],
             "repo_count": db.execute("select count(*) from repos").fetchone()[0],
