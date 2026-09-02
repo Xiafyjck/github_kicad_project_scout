@@ -17,6 +17,8 @@
 5. **本地初筛（后处理）** `03_filter_kicad_projects.py`。只读候选库与文件树库，纯本地运算，无网络请求，每次全量重算，结果存入 `data/cache/filter_kicad_projects/state.sqlite`：`qualified_projects`（每工程目录一行）、`qualified_repos`（每仓库一行汇总）、`repo_filter_status`（每个候选仓库的筛选结论）。
 6. **发布** `04_release_github_trees.py`。只读以上三库，导出到 `data/releases/<date>/`：`repos.csv`（全量候选仓库与拉取状态）、`trees.jsonl`（每仓库一行完整文件树，条目保留 path/mode/type/sha/size）、`qualified_repos.csv`（初筛合格仓库清单，以仓库为单位）、`manifest.json`（计数、各库 meta、筛选规则、文件 sha256）。随后整个目录打包为 `data/releases/<date>.zip`，作为 GitHub Release 附件上传。`data/` 下任何内容都不提交。
 
+7. **仓库活跃度统计** `05_github_fetch_repo_stats.py`。只读候选库，通过 GitHub GraphQL 每次查询 25 个仓库，取默认分支 commit 数、PR 总数与已合并数、issue 数、fork/archived/disabled 标志、parent、pushedAt、stars 等。原始响应按 query + variables 缓存，每仓库一行写入 `data/cache/github_repo_stats/state.sqlite` 的 `repo_stats`。供改进历史阶段筛入围仓库。
+
 按编号顺序运行：
 
 ```bash
@@ -25,6 +27,7 @@ uv run scripts/01_github_merge_candidates.py
 uv run scripts/02_github_fetch_trees.py
 uv run scripts/03_filter_kicad_projects.py
 uv run scripts/04_release_github_trees.py
+uv run scripts/05_github_fetch_repo_stats.py
 ```
 
 每个脚本从自己的 SQLite 缓存断点续跑。缓存完整时整条链重跑不发任何 API 请求。
@@ -43,7 +46,8 @@ pcb_project_scout/
 │   ├── 01_github_merge_candidates.py # 合并候选仓库（本地）
 │   ├── 02_github_fetch_trees.py      # 拉取文件树（网络，仅缓存原始响应）
 │   ├── 03_filter_kicad_projects.py   # 本地初筛（本地）
-│   └── 04_release_github_trees.py    # 发布导出（本地）
+│   ├── 04_release_github_trees.py    # 发布导出（本地）
+│   └── 05_github_fetch_repo_stats.py # 仓库活跃度统计，GraphQL（网络）
 └── data/             # gitignore；缓存只留本地，发布走 GitHub Releases
     ├── cache/<stage>/state.sqlite    # 各阶段断点缓存，上游库对下游只读
     ├── releases/<date>/              # 发布产物，未打包
@@ -65,10 +69,17 @@ pcb_project_scout/
 - [x] 截断仓库处理：决定忽略（占比极小，补全成本过高）
 - [x] 发布初版 Release A（`data/releases/2026-09-02/`，39902 仓库，39898 文件树，1728 万条目，32029 合格仓库 / 66793 工程）
 
+
 ### 后处理
 
 - [x] 初筛工程完整仓库（含 kicad_pro、kicad_sch、kicad_pcb、readme）
 - [ ] 筛选含 3D 模型的仓库
+
+### 进一步筛选
+- [ ] 仓库活跃度统计，全量 4 万仓库。用 GraphQL ，返回默认分支 commit 总数、PR 总数与已合并数、issue 总数、isFork、isArchived、pushedAt、stars。约 400 到 800 次请求，一个 token 一小时内跑完。缓存方式不变：raw JSON 按 query + variables 入 SQLite。
+- [ ] 对入围仓库（例如 merged PR ≥ 1 或 commit ≥ 5 且 issue ≥ 1）。每个合格工程目录拉 `commits?path=<project_dir>` 得到触及该工程的 commit 序列；每个 PR 拉 `files` 看是否改了 kicad_pcb / kicad_sch；issue 全量列表。这些是 REST API，成本随入围数走。
+- [ ] 把 commit / PR / issue 关联到工程目录，产出"改进事件"表：改动前后 tree sha、改动文件、PR 或 issue 文本。benchmark 从这里选题，改动前状态作输入，改动后作参考答案。
+- [ ] 发布 release
 
 ### 重构
 
