@@ -48,7 +48,9 @@ CACHE_DIR = Path("data/cache/github_repo_history")
 DB_PATH = CACHE_DIR / "state.sqlite"
 SCHEMA_VERSION = 1
 
-CACHEABLE_FAILURE_STATUSES = {"not_found", "empty_repo", "unavailable_legal", "access_blocked"}
+# diff_too_large: observed HTTP 422 "this diff is taking too long to generate" on pulls/{n}/files; permanent
+# for that PR, so it is cached and the repo can still finish.
+CACHEABLE_FAILURE_STATUSES = {"not_found", "empty_repo", "unavailable_legal", "access_blocked", "diff_too_large"}
 
 
 @dataclass(frozen=True)
@@ -167,6 +169,8 @@ def failure_status(status_code: int, headers: dict[str, str], data: Any) -> str:
         return "empty_repo"
     if status_code == 451:
         return "unavailable_legal"
+    if status_code == 422 and "diff is taking too long" in message:
+        return "diff_too_large"
     if is_rate_limit_response(status_code, headers, message):
         return "retryable_error"
     if status_code >= 500 or status_code in {429, 422}:
