@@ -21,6 +21,8 @@ Conventions for contributors and coding agents live in [AGENTS.md](AGENTS.md).
 
 8. **Project improvement history** `06_github_fetch_repo_history.py`. Reads candidates, filter, and stats DBs read-only and walks, for every candidate repo, four REST listings with all pages: `commits?path=<project_dir>` per qualified project dir (whole-repo history when the repo has none), every PR, the changed files of every PR, and every issue. Raw pages are cached by URL + params in `data/cache/github_repo_history/state.sqlite`; `listing_pages` indexes them by repo, kind, subject, page. Shortlisted and qualified repos are queued first.
 
+9. **Improvement events (post-processing)** `07_build_improvement_events.py`. Reads the stage 06 cache read-only, runs offline, recomputes everything each run, and writes `data/cache/improvement_events/state.sqlite`: `commits`, `commit_touches`, `pull_requests`, `pull_request_files` (patch text stays in the stage 06 cache, referenced by `api_cache_id`), `issues`, and `improvement_events`. An event is one PCB change with its explanation: a PR whose changed files include `.kicad_pcb` / `.kicad_sch` / `.kicad_pro` (one event per PR and project dir, before = base sha, after = merge or head sha, changed KiCad files listed), or a commit from `commits?path=<qualified project dir>` (before = first parent, after = the commit, files unknown). `#N` references in the text are resolved to the repo's issues.
+
 Run the scripts in numeric order:
 
 ```bash
@@ -31,6 +33,7 @@ uv run scripts/03_filter_kicad_projects.py
 uv run scripts/04_release_github_trees.py
 uv run scripts/05_github_fetch_repo_stats.py
 uv run scripts/06_github_fetch_repo_history.py
+uv run scripts/07_build_improvement_events.py
 ```
 
 Every script resumes from its own SQLite cache. Rerunning the whole chain against a complete cache makes no API calls.
@@ -51,7 +54,8 @@ pcb_project_scout/
 │   ├── 03_filter_kicad_projects.py   # local first pass (local)
 │   ├── 04_release_github_trees.py    # release export (local)
 │   ├── 05_github_fetch_repo_stats.py # repo activity stats via GraphQL (network)
-│   └── 06_github_fetch_repo_history.py # commits / PRs / PR files / issues per repo (network)
+│   ├── 06_github_fetch_repo_history.py # commits / PRs / PR files / issues per repo (network)
+│   └── 07_build_improvement_events.py  # improvement events from the history cache (local)
 └── data/             # gitignored; caches stay local, releases go to GitHub Releases
     ├── cache/<stage>/state.sqlite    # per-stage resumable cache; upstream DBs are read-only downstream
     ├── releases/<date>/              # release artifacts, unpacked
@@ -81,7 +85,7 @@ pcb_project_scout/
 ### Further filtering
 - [x] Repo activity stats, all ~40k repos (done 2026-09-03: 39895 fetched, 7 not found, 1597 GraphQL queries). GraphQL returns default-branch commit count, PR count total and merged, issue count, isFork, isArchived, pushedAt, stars. About 400 to 800 requests, one token finishes within an hour. Caching unchanged: raw JSON keyed by query + variables in SQLite.
 - [x] Improvement history for every candidate repo (done 2026-09-03: 321k requests, 964k commits, 140k PRs with 3.45M changed files, 238k issues, 24.6 GB cache): for every qualified project dir fetch `commits?path=<project_dir>` to get the commit sequence touching that project; for every PR fetch `files` to see whether kicad_pcb / kicad_sch changed; full issue list. REST API, cost scales with the shortlist.
-- [ ] Link commits / PRs / issues to project dirs and produce an "improvement event" table: tree sha before and after, changed files, PR or issue text. Benchmark tasks are picked from here: the before state is the input, the after state is the reference answer.
+- [x] (done 2026-09-03: 390317 events in `data/cache/improvement_events`, 29675 from PRs of which 27303 merged, 356473 from commits) Link commits / PRs / issues to project dirs and produce an "improvement event" table: tree sha before and after, changed files, PR or issue text. Benchmark tasks are picked from here: the before state is the input, the after state is the reference answer.
 - [ ] Publish a release
 
 ### Refactoring
