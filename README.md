@@ -108,7 +108,7 @@ The script that packs and uploads the caches is not part of this repo.
 - [x] Fetch file trees for the first candidate set
 - [x] Truncated repos: decided to ignore (tiny share, completion too costly)
 - [x] Release A on GitHub (`release-A`: repos, trees, qualified repos; 39902 repos, 39898 trees, 17.3M entries)
-- [ ] Release B on ModelScope: every stage cache as `cache/<stage>/state.sqlite.zst`
+- [x] Release B on ModelScope (2026-09-04): every stage cache as `cache/<stage>/state.sqlite.zst`, 8.2 GB packed / 95 GB unpacked, restore verified with `00_restore_cache.py`
 - [ ] Run stages 03 to 09 on the 29279 repos added by the other three suffix searches
 
 ### Post-processing
