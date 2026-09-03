@@ -39,7 +39,7 @@ MAX_SERVER_ERROR_RETRIES = 4
 MAX_SECONDARY_RATE_LIMIT_RETRIES = 6
 PRIMARY_RATE_LIMIT_SAFETY_REMAINING = 25
 
-# Local state: stage 06 caches raw list pages and an index of which page belongs to which repo/kind.
+# Local state: stage 07 caches raw list pages and an index of which page belongs to which repo/kind.
 # Upstream DBs are read-only: candidates (repo list), filter (project dirs), stats (priority).
 CANDIDATES_DB_PATH = Path("data/cache/github_candidates/state.sqlite")
 FILTER_DB_PATH = Path("data/cache/filter_kicad_projects/state.sqlite")

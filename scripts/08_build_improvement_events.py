@@ -9,13 +9,13 @@ from pathlib import Path
 from typing import Any
 
 
-# Stage 07, local post-processing: turn the raw stage 06 listings into commit / PR / issue tables and an
+# Stage 08, local post-processing: turn the raw stage 07 listings into commit / PR / issue tables and an
 # "improvement event" table that links each PCB change to a project dir, its before/after states, and
 # the text explaining it. Reads upstream DBs read-only, recomputes everything each run, no network.
 CANDIDATES_DB_PATH = Path("data/cache/github_candidates/state.sqlite")
 FILTER_DB_PATH = Path("data/cache/filter_kicad_projects/state.sqlite")
 HISTORY_DB_PATH = Path("data/cache/github_repo_history/state.sqlite")
-COMMIT_FILES_DB_PATH = Path("data/cache/github_commit_files/state.sqlite")  # stage 08, optional
+COMMIT_FILES_DB_PATH = Path("data/cache/github_commit_files/state.sqlite")  # stage 09, optional
 CACHE_DIR = Path("data/cache/improvement_events")
 DB_PATH = CACHE_DIR / "state.sqlite"
 SCHEMA_VERSION = 1
@@ -25,7 +25,7 @@ ISSUE_REF_RE = re.compile(r"(?<![\w/])#(\d+)\b")
 CLOSING_REF_RE = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)\b", re.IGNORECASE)
 EVENT_RULE = {
     "pull_request": "PR whose changed files include a .kicad_pcb/.kicad_sch/.kicad_pro file; one event per (PR, project dir); before = base sha, after = merge commit sha when GitHub reports one, else head sha",
-    "commit": "commit listed by commits?path=<qualified project dir>; before = first parent, after = the commit; changed files from stage 08 when fetched (files_known = 1), else unknown (0)",
+    "commit": "commit listed by commits?path=<qualified project dir>; before = first parent, after = the commit; changed files from stage 09 when fetched (files_known = 1), else unknown (0)",
     "project_dir": "deepest qualified project dir containing the file (in_qualified_project = 1), else the file's own directory (0)",
     "linked_issues": "#N references in title/body that resolve to a non-PR issue of the same repo; closing keywords tracked separately",
 }
@@ -55,7 +55,7 @@ def setup_db() -> sqlite3.Connection:
               value text not null
             );
 
-            -- commits: every commit seen in any stage 06 commit listing of the repo (de-duplicated by sha).
+            -- commits: every commit seen in any stage 07 commit listing of the repo (de-duplicated by sha).
             create table if not exists commits (
               repo_id integer not null,
               sha text not null,
@@ -101,8 +101,8 @@ def setup_db() -> sqlite3.Connection:
               primary key (repo_id, number)
             );
 
-            -- commit_files: one row per changed file of a stage 08 fetched commit; patch text stays in the
-            -- stage 08 api_cache row referenced by api_cache_id.
+            -- commit_files: one row per changed file of a stage 09 fetched commit; patch text stays in the
+            -- stage 09 api_cache row referenced by api_cache_id.
             create table if not exists commit_files (
               repo_id integer not null,
               sha text not null,
@@ -118,7 +118,7 @@ def setup_db() -> sqlite3.Connection:
               primary key (repo_id, sha, filename)
             );
 
-            -- pull_request_files: one row per changed file; the patch text stays in the stage 06 api_cache
+            -- pull_request_files: one row per changed file; the patch text stays in the stage 07 api_cache
             -- row referenced by api_cache_id.
             create table if not exists pull_request_files (
               repo_id integer not null,
@@ -249,7 +249,7 @@ def load_repo_pages(history: sqlite3.Connection, repo_id: int) -> dict[str, dict
 
 
 def load_commit_files(commit_files_db: sqlite3.Connection | None, repo_id: int) -> dict[str, list[tuple[int, dict[str, Any]]]]:
-    # {sha: [(api_cache_id, file)]} for every commit stage 08 fetched with HTTP 200 for this repo.
+    # {sha: [(api_cache_id, file)]} for every commit stage 09 fetched with HTTP 200 for this repo.
     files: dict[str, list[tuple[int, dict[str, Any]]]] = {}
     if commit_files_db is None:
         return files

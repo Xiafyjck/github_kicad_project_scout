@@ -26,7 +26,7 @@ GITHUB_ACCEPT_HEADER = "application/vnd.github+json"
 GITHUB_PER_PAGE_MAX = 100
 COMMIT_ENDPOINT_TEMPLATE = "/repositories/{repo_id}/commits/{sha}"
 
-# Collection policy: every commit that stage 06 listed for a qualified project dir (commit_touches joined
+# Collection policy: every commit that stage 07 listed for a qualified project dir (commit_touches joined
 # with qualified_projects), de-duplicated by (repo, sha). ONLY_EXPLAINED_COMMITS narrows that to commits
 # whose message has a body or an #N reference.
 ONLY_EXPLAINED_COMMITS = False
@@ -39,15 +39,15 @@ MAX_TRANSPORT_BACKOFF_SECONDS = 60
 MAX_SECONDARY_RATE_LIMIT_RETRIES = 6
 PRIMARY_RATE_LIMIT_SAFETY_REMAINING = 25
 
-# Local state: stage 08 caches raw commit responses and an index page per (repo, sha, page).
-# Upstream DBs are read-only: filter (project dirs) and stage 07 (commit_touches, commits).
+# Local state: stage 09 caches raw commit responses and an index page per (repo, sha, page).
+# Upstream DBs are read-only: filter (project dirs) and stage 08 (commit_touches, commits).
 FILTER_DB_PATH = Path("data/cache/filter_kicad_projects/state.sqlite")
 EVENTS_DB_PATH = Path("data/cache/improvement_events/state.sqlite")
 CACHE_DIR = Path("data/cache/github_commit_files")
 DB_PATH = CACHE_DIR / "state.sqlite"
 SCHEMA_VERSION = 1
 
-# Terminal failures observed on stage 06, same family of endpoints:
+# Terminal failures observed on stage 07, same family of endpoints:
 CACHEABLE_FAILURE_STATUSES = {
     "not_found",
     "empty_repo",

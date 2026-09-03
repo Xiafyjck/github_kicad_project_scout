@@ -9,7 +9,9 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.28.0",
+    "modelscope>=1.39.1",
     "python-dotenv>=1.0.0",
+    "zstandard>=0.25.0",
 ]
 
 [dependency-groups]

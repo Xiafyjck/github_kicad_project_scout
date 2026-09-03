@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-# Stage 03, local first pass: read candidate and tree DBs read-only, run offline, recompute everything each run. Rule changes cost no API quota.
+# Stage 04, local first pass: read candidate and tree DBs read-only, run offline, recompute everything each run. Rule changes cost no API quota.
 CANDIDATES_DB_PATH = Path("data/cache/github_candidates/state.sqlite")
 TREES_DB_PATH = Path("data/cache/github_trees/state.sqlite")
 CACHE_DIR = Path("data/cache/filter_kicad_projects")

@@ -18,11 +18,11 @@ Rules for anyone, human or coding agent, who changes this repo. Read [README.md]
 - **Small, self-contained scripts.** One script per stage, no shared package yet. Reuse helper functions by copying while the script count is small; extract a common module only once the GitHub scripts have accumulated. Prefer incremental commits over large rewrites.
 - **English only in code.** Comments, docstrings, log lines, and error messages are English. Chinese lives only in README.zh-CN.md.
 - **Keep the README TODO list current.** Tick items when done, add new ones in both README files.
-- **Run with uv.** `uv run scripts/<nn>_<name>.py` from the repo root. Python 3.11+, deps are httpx and python-dotenv only.
-- **Tokens come from `.env`.** `GITHUB_TOKEN_1..N`. Never print, log, or commit them.
+- **Run with uv.** `uv run scripts/<nn>_<name>.py` from the repo root. Python 3.11+, deps are httpx, python-dotenv, modelscope, zstandard.
+- **Tokens come from `.env`.** `GITHUB_TOKEN_1..N` for fetching, `MODELSCOPE_TOKEN` for publishing. Never print, log, or commit them.
 
 ## Working with an agent
 
 - Report cache state before assuming pipeline state: query `repo_status` in `data/cache/github_trees/state.sqlite` and `query_status` in the search caches.
-- Do not delete or rewrite a stage DB without being asked. `data/` is gitignored: stage caches exist only on the machine that fetched them and cannot be recovered from git. Releases are published as GitHub Release assets.
+- Do not delete or rewrite a stage DB without being asked. `data/` is gitignored: stage caches exist only on the machine that fetched them and cannot be recovered from git. The caches are published as a ModelScope dataset (Mask2X/pcb-project-scout, same layout as `data/cache/`); `scripts/00_restore_cache.py` downloads them. The packing / upload script is private and not committed.
 - Keep README.md and README.zh-CN.md in sync when the pipeline or layout changes.

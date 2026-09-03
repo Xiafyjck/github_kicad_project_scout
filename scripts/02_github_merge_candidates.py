@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-# Stage 01, merge candidates: union every search-strategy cache, de-duplicate by repo_id. Local only, no network.
+# Stage 02, merge candidates: union every search-strategy cache, de-duplicate by repo_id. Local only, no network.
 SOURCE_DB_GLOB = "data/cache/github_code_search_*/state.sqlite"
 CACHE_DIR = Path("data/cache/github_candidates")
 DB_PATH = CACHE_DIR / "state.sqlite"

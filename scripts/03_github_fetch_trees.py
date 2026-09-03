@@ -30,7 +30,7 @@ MAX_SERVER_ERROR_RETRIES = 4
 MAX_SECONDARY_RATE_LIMIT_RETRIES = 6
 PRIMARY_RATE_LIMIT_SAFETY_REMAINING = 25
 
-# Local state: stage 02 only caches raw tree responses, no business logic. Candidates come from the stage 01 merge DB (read-only).
+# Local state: stage 03 only caches raw tree responses, no business logic. Candidates come from the stage 02 merge DB (read-only).
 CANDIDATES_DB_PATH = Path("data/cache/github_candidates/state.sqlite")
 CACHE_DIR = Path("data/cache/github_trees")
 DB_PATH = CACHE_DIR / "state.sqlite"
