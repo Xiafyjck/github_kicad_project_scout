@@ -342,7 +342,9 @@ def build_repo(
 
     seen_commit_events: set[tuple[str, str]] = set()
     for subject, page_list in pages.get("commits", {}).items():
-        if subject == "" or subject not in project_dirs:
+        # subject '' is both the whole-repo listing (repos with no qualified dir) and a root-level project;
+        # only the latter is in project_dirs.
+        if subject not in project_dirs:
             continue
         for _page, _cache_id, items in page_list:
             for item in items:
