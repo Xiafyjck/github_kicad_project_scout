@@ -41,6 +41,7 @@ Downloads the stages listed in the `STAGES` constant, verifies sha256, and unpac
 7. **Repo history** `07_github_fetch_repo_history.py`. For every candidate repo, four REST listings with all pages: `commits?path=<project_dir>` per qualified project dir (whole-repo history when the repo has none), every PR, the changed files of every PR (with patch), every issue. Raw pages cached by URL + params; `listing_pages` indexes them by repo, kind, subject, page.
 8. **Improvement events** `08_build_improvement_events.py`. Local post-processing over stages 07 and 09: `commits`, `commit_touches`, `pull_requests`, `pull_request_files`, `commit_files`, `issues`, and `improvement_events`. An event is one PCB change with its explanation: a PR whose changed files include `.kicad_pcb` / `.kicad_sch` / `.kicad_pro` (one event per PR and project dir, before = base sha, after = merge or head sha), or a commit listed under a qualified project dir (before = first parent, after = the commit). Per-suffix file counts, changed-file lists, and `#N` issue references are attached.
 9. **Commit files** `09_github_fetch_commit_files.py`. For every commit stage 07 listed under a qualified project dir, fetches `commits/{sha}` with all file pages so commit events carry the same file detail as PR events. Rerun stage 08 afterwards.
+10. **Event quality** `10_analyze_event_quality.py`. Local. Scores every event for benchmark use: text quality (templates, TODO lists, bare issue numbers dropped), change size caps, modified-only KiCad files, save-only churn detected from the patch text (uuid / tstamp / version lines vs real changes), per-repo quota, plus a 3D-model census of qualified repos. Writes `data/cache/event_quality/state.sqlite` and the report `reports/event_quality.md` with a seed CSV of issue-driven events.
 
 Run in numeric order:
 
@@ -55,6 +56,7 @@ uv run scripts/07_github_fetch_repo_history.py
 uv run scripts/08_build_improvement_events.py
 uv run scripts/09_github_fetch_commit_files.py
 uv run scripts/08_build_improvement_events.py   # again, to fill commit events with files
+uv run scripts/10_analyze_event_quality.py
 ```
 
 Every script resumes from its own SQLite cache. Rerunning the whole chain against a complete cache makes no API call. Scripts take no command-line arguments; run parameters are constants at the top of each file.
@@ -76,6 +78,7 @@ pcb_project_scout/
 ├── AGENTS.md         # conventions for contributors and coding agents
 ├── pyproject.toml    # deps: uv, httpx, python-dotenv, modelscope, zstandard
 ├── .env.example      # env: GITHUB_TOKEN_1..N (fetching), MODELSCOPE_TOKEN (publishing only)
+├── reports/          # generated analysis reports (committed)
 ├── scripts/          # self-contained stage scripts, run in numeric order, all resumable or fully recomputable
 │   ├── 00_restore_cache.py             # download + unpack the published caches from ModelScope
 │   ├── 01_github_code_search_bins.py   # multi-suffix code search (network)
@@ -86,7 +89,8 @@ pcb_project_scout/
 │   ├── 06_github_fetch_repo_stats.py   # repo activity stats via GraphQL (network)
 │   ├── 07_github_fetch_repo_history.py # commits / PRs / PR files / issues per repo (network)
 │   ├── 08_build_improvement_events.py  # improvement events from the history caches (local)
-│   └── 09_github_fetch_commit_files.py # changed files of every commit in a project dir (network)
+│   ├── 09_github_fetch_commit_files.py # changed files of every commit in a project dir (network)
+│   └── 10_analyze_event_quality.py     # event quality tiers, quota, 3D census, report (local)
 └── data/             # gitignored; caches stay local, releases go to ModelScope
     ├── cache/<stage>/state.sqlite    # per-stage resumable cache; upstream DBs are read-only downstream
     └── releases/                     # packed releases and the restore download dir
@@ -115,15 +119,16 @@ The script that packs and uploads the caches is not part of this repo.
 
 - [x] First pass: repos with a complete project (kicad_pro + kicad_sch + kicad_pcb in one dir, README nearby): 32029 repos, 66793 project dirs
 - [x] Improvement events table (523908 events: 33844 from PRs, 490064 from commits, all with changed-file detail and per-suffix counts)
-- [ ] Event quality filters
-  - [ ] Text: drop PR / commit bodies that are templates, TODO lists, or bare issue numbers; keep "why + what" explanations
-  - [ ] Size: cap `.kicad_pcb` / `.kicad_sch` line changes to exclude re-imports, version upgrades, generated boards
-  - [ ] Existing files only: keep events whose KiCad files are all `modified` (no added / renamed / removed) so before and after states pair up
-  - [ ] Save-only rewrites: parse `.kicad_sch` / `.kicad_pcb` S-expressions and compare netlists so UUID or format churn does not count as a design change
-  - [ ] Per-repo quota so a few tool-generated repos do not dominate
+- [x] Event quality filters (stage 10, see `reports/event_quality.md`)
+  - [x] Text: drop PR / commit bodies that are templates, TODO lists, or bare issue numbers
+  - [x] Size: cap KiCad line changes and changed-file count
+  - [x] Existing files only: all KiCad files `modified`
+  - [x] Save-only rewrites: patch-based churn heuristic (uuid / tstamp / version lines); full netlist comparison still open
+  - [x] Per-repo quota
+  - [ ] Netlist comparison on full files at before / after sha
 - [ ] Validate candidate events with KiCad CLI: DRC / ERC before and after, keep events where error counts do not grow
-- [ ] Manual review of the 801 issue-driven merged PRs as the first benchmark seed set
-- [ ] Filter repos that ship 3D models
+- [ ] Manual review of the tier A seed set (`reports/seed_issue_driven_prs.csv`)
+- [x] 3D-model census of qualified repos (table `repo_3d_models`, counts in the report)
 
 ### Releases
 

@@ -41,6 +41,7 @@ uv run scripts/00_restore_cache.py
 7. **仓库历史** `07_github_fetch_repo_history.py`。对每个候选仓库拉四类列表的全部分页：每个合格工程目录的 `commits?path=<project_dir>`（无合格目录则拉整库历史）、全部 PR、每个 PR 的改动文件（含 patch）、全部 issue。原始页按 URL + 参数缓存；`listing_pages` 按仓库、类型、主体、页号索引。
 8. **改进事件** `08_build_improvement_events.py`。本地后处理，读 07 与 09 的缓存：`commits`、`commit_touches`、`pull_requests`、`pull_request_files`、`commit_files`、`issues`、`improvement_events`。一个事件是一次带说明的 PCB 改动：改动文件含 `.kicad_pcb` / `.kicad_sch` / `.kicad_pro` 的 PR（每个 PR 与工程目录一条，before = base sha，after = merge 或 head sha），或合格工程目录下列出的 commit（before = 第一个父提交，after = 该 commit）。附带按后缀的文件计数、改动文件清单、`#N` 引用的 issue。
 9. **commit 改动文件** `09_github_fetch_commit_files.py`。对 07 在合格工程目录下列出的每个 commit 拉 `commits/{sha}` 的全部文件页，使 commit 事件与 PR 事件有同样的文件明细。之后重跑 08。
+10. **事件质量** `10_analyze_event_quality.py`。本地。给每个事件打 benchmark 可用性分：文本质量（剔除模板、TODO 列表、纯 issue 编号）、改动规模上限、KiCad 文件全为 modified、从 patch 文本识别只存盘的 churn（uuid / tstamp / version 行与真实改动分开计数）、仓库限额，另附合格仓库的 3D 模型普查。写出 `data/cache/event_quality/state.sqlite` 与报告 `reports/event_quality.md`，以及 issue 驱动事件的种子 CSV。
 
 按编号顺序运行：
 
@@ -55,6 +56,7 @@ uv run scripts/07_github_fetch_repo_history.py
 uv run scripts/08_build_improvement_events.py
 uv run scripts/09_github_fetch_commit_files.py
 uv run scripts/08_build_improvement_events.py   # 再跑一次，把 commit 事件的文件填上
+uv run scripts/10_analyze_event_quality.py
 ```
 
 每个脚本从自己的 SQLite 缓存断点续跑。缓存完整时整条链重跑不发任何 API 请求。脚本无命令行参数，运行参数是各脚本顶部的常量。
@@ -76,6 +78,7 @@ pcb_project_scout/
 ├── AGENTS.md         # 贡献者与编码 agent 的开发约定
 ├── pyproject.toml    # 依赖：uv、httpx、python-dotenv、modelscope、zstandard
 ├── .env.example      # 环境变量：GITHUB_TOKEN_1..N（拉取）、MODELSCOPE_TOKEN（仅发布）
+├── reports/          # 生成的分析报告（入库）
 ├── scripts/          # 各阶段自包含脚本，按编号顺序执行，均支持断点续跑或全量重算
 │   ├── 00_restore_cache.py             # 从 ModelScope 下载并解压已发布缓存
 │   ├── 01_github_code_search_bins.py   # 多后缀代码搜索（网络）
@@ -86,7 +89,8 @@ pcb_project_scout/
 │   ├── 06_github_fetch_repo_stats.py   # 仓库活跃度统计，GraphQL（网络）
 │   ├── 07_github_fetch_repo_history.py # 每仓库的 commit / PR / PR 文件 / issue（网络）
 │   ├── 08_build_improvement_events.py  # 从历史缓存构建改进事件（本地）
-│   └── 09_github_fetch_commit_files.py # 工程目录内每个 commit 的改动文件（网络）
+│   ├── 09_github_fetch_commit_files.py # 工程目录内每个 commit 的改动文件（网络）
+│   └── 10_analyze_event_quality.py     # 事件质量分层、限额、3D 普查、报告（本地）
 └── data/             # gitignore；缓存只留本地，发布走 ModelScope
     ├── cache/<stage>/state.sqlite    # 各阶段断点缓存，上游库对下游只读
     └── releases/                     # 打包好的发布与 restore 的下载目录
@@ -115,15 +119,16 @@ pcb_project_scout/
 
 - [x] 初筛：有完整工程的仓库（同目录 kicad_pro + kicad_sch + kicad_pcb，附近有 README）：32029 仓库，66793 工程目录
 - [x] 改进事件表（523908 条：PR 33844，commit 490064，全部带文件明细与按后缀计数）
-- [ ] 事件质量过滤
-  - [ ] 文本：剔除模板、TODO 列表、纯 issue 编号的 PR / commit 正文，保留"为什么 + 改了什么"的说明
-  - [ ] 规模：给 `.kicad_pcb` / `.kicad_sch` 的改动行数设上限，排除重新导入、版本升级、生成的板子
-  - [ ] 只保留已有文件：KiCad 文件全为 `modified`（无 added / renamed / removed），保证前后状态一一对应
-  - [ ] 只存盘不改电路：解析 `.kicad_sch` / `.kicad_pcb` 的 S 表达式比较网表，UUID 或格式变动不算设计改动
-  - [ ] 仓库限额，避免少数工具生成的仓库垄断
+- [x] 事件质量过滤（阶段 10，见 `reports/event_quality.md`）
+  - [x] 文本：剔除模板、TODO 列表、纯 issue 编号的 PR / commit 正文
+  - [x] 规模：KiCad 改动行数与改动文件数上限
+  - [x] 只保留已有文件：KiCad 文件全为 `modified`
+  - [x] 只存盘不改电路：基于 patch 的 churn 启发式（uuid / tstamp / version 行）；完整网表比较仍待做
+  - [x] 仓库限额
+  - [ ] 在前后 sha 的完整文件上比较网表
 - [ ] 用 KiCad CLI 验证候选事件：改动前后跑 DRC / ERC，错误数不增加的保留
-- [ ] 人工审阅 801 个 issue 驱动的已合并 PR，作为首批 benchmark 种子
-- [ ] 筛选含 3D 模型的仓库
+- [ ] 人工审阅 A 级种子集（`reports/seed_issue_driven_prs.csv`）
+- [x] 合格仓库的 3D 模型普查（表 `repo_3d_models`，数字见报告）
 
 ### 发布
 
