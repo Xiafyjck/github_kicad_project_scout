@@ -32,6 +32,10 @@ COMMIT_ENDPOINT_TEMPLATE = "/repositories/{repo_id}/commits/{sha}"
 ONLY_EXPLAINED_COMMITS = False
 REQUEST_INTERVAL_SECONDS = 0.75
 MAX_SERVER_ERROR_RETRIES = 4
+# Observed: a short local network outage (DNS ConnectError) killed a 10-hour run after 4 retries.
+# Transport errors now back off up to 60s and retry for ~30 minutes before giving up.
+MAX_TRANSPORT_RETRIES = 30
+MAX_TRANSPORT_BACKOFF_SECONDS = 60
 MAX_SECONDARY_RATE_LIMIT_RETRIES = 6
 PRIMARY_RATE_LIMIT_SAFETY_REMAINING = 25
 
@@ -470,19 +474,20 @@ def fetch_github_commit_files() -> dict[str, Any]:
                 if cached is not None:
                     return cached
                 server_errors = 0
+                transport_errors = 0
                 secondary_rate_limit_errors = 0
                 while True:
                     wait_before_request()
                     try:
                         response = client.get(endpoint, params=params)
                     except httpx.TransportError as exc:
-                        server_errors += 1
-                        if server_errors <= MAX_SERVER_ERROR_RETRIES:
-                            sleep_seconds = min(30, 2**server_errors)
-                            print(f"token#{token_no} transport {type(exc).__name__}, retry {server_errors}, sleep {sleep_seconds}s", flush=True)
+                        transport_errors += 1
+                        if transport_errors <= MAX_TRANSPORT_RETRIES:
+                            sleep_seconds = min(MAX_TRANSPORT_BACKOFF_SECONDS, 2**transport_errors)
+                            print(f"token#{token_no} transport {type(exc).__name__}, retry {transport_errors}, sleep {sleep_seconds}s", flush=True)
                             sleep_or_stop(sleep_seconds)
                             continue
-                        raise RuntimeError(f"request failed after {MAX_SERVER_ERROR_RETRIES} retries: {endpoint}: {type(exc).__name__}: {exc}") from exc
+                        raise RuntimeError(f"request failed after {MAX_TRANSPORT_RETRIES} retries: {endpoint}: {type(exc).__name__}: {exc}") from exc
 
                     data = response_data(response)
                     headers = dict(response.headers)
