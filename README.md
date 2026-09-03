@@ -71,9 +71,9 @@ pcb_project_scout/
 ### Search strategies
 
 - [x] Repos containing `kicad_pro` files
-- [ ] Repos containing `kicad_pcb` files
-- [ ] Repos containing `kicad_sch` files
-- [ ] Repos containing `sch` files
+- [x] Repos containing `kicad_pcb` files (26676 repos)
+- [x] Repos containing `kicad_sch` files (37202 repos)
+- [x] Repos containing `sch` files (30515 repos; merged candidate list is 69181 repos, 50796 with KiCad 6+ files)
 
 ### File trees and release
 
