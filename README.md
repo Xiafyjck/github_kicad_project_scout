@@ -103,27 +103,36 @@ The script that packs and uploads the caches is not part of this repo.
 - [x] Repos containing `kicad_sch` files (37202 repos)
 - [x] Repos containing `sch` files (30515 repos; merged candidate list is 69181 repos, 50796 with KiCad 6+ files)
 
-### File trees and release
+### Fetching
 
-- [x] Fetch file trees for the first candidate set
-- [x] Truncated repos: decided to ignore (tiny share, completion too costly)
-- [x] Release A on GitHub (`release-A`: repos, trees, qualified repos; 39902 repos, 39898 trees, 17.3M entries)
-- [x] Release B on ModelScope (2026-09-04): every stage cache as `cache/<stage>/state.sqlite.zst`, 8.2 GB packed / 95 GB unpacked, restore verified with `00_restore_cache.py`
-- [ ] Run stages 03 to 09 on the 29279 repos added by the other three suffix searches
+- [x] File trees for the first candidate set (39902 repos, 21 truncated and ignored)
+- [x] Repo activity stats via GraphQL (39895 fetched, 7 not found)
+- [x] Commits, PRs, PR files, issues for every candidate repo (321k requests, 964k commits, 140k PRs, 3.45M PR files, 238k issues)
+- [x] Changed files of every commit in a project dir (423293 commits, 8.87M files)
+- [ ] Run stages 03 to 09 on the 29279 repos added by the other three suffix searches (trees, stats, history, commit files), then rebuild stage 08
 
 ### Post-processing
 
-- [x] First pass: repos with complete projects (kicad_pro, kicad_sch, kicad_pcb, README)
+- [x] First pass: repos with a complete project (kicad_pro + kicad_sch + kicad_pcb in one dir, README nearby): 32029 repos, 66793 project dirs
+- [x] Improvement events table (523908 events: 33844 from PRs, 490064 from commits, all with changed-file detail and per-suffix counts)
+- [ ] Event quality filters
+  - [ ] Text: drop PR / commit bodies that are templates, TODO lists, or bare issue numbers; keep "why + what" explanations
+  - [ ] Size: cap `.kicad_pcb` / `.kicad_sch` line changes to exclude re-imports, version upgrades, generated boards
+  - [ ] Existing files only: keep events whose KiCad files are all `modified` (no added / renamed / removed) so before and after states pair up
+  - [ ] Save-only rewrites: parse `.kicad_sch` / `.kicad_pcb` S-expressions and compare netlists so UUID or format churn does not count as a design change
+  - [ ] Per-repo quota so a few tool-generated repos do not dominate
+- [ ] Validate candidate events with KiCad CLI: DRC / ERC before and after, keep events where error counts do not grow
+- [ ] Manual review of the 801 issue-driven merged PRs as the first benchmark seed set
 - [ ] Filter repos that ship 3D models
 
-### Further filtering
+### Releases
 
-- [x] Repo activity stats, all ~40k repos (39895 fetched, 7 not found, 1597 GraphQL queries)
-- [x] Improvement history for every candidate repo (321k requests, 964k commits, 140k PRs with 3.45M changed files, 238k issues)
-- [x] Commit files for every commit in a project dir (423293 commits, 8.87M changed files)
-- [x] Improvement events table (523908 events: 33844 from PRs, 490064 from commits, all with changed-file detail)
-- [ ] Event quality filters: drop template / TODO bodies, cap change size, detect save-only rewrites of `.kicad_sch` by comparing netlists, per-repo quota
+- [x] Release A on GitHub (`release-A`: repos, trees, qualified repos)
+- [x] Release B on ModelScope (2026-09-04): every stage cache as `cache/<stage>/state.sqlite.zst`, 8.2 GB packed / 95 GB unpacked, restore verified with `00_restore_cache.py`
+- [ ] Release C on ModelScope after the 29279 added repos are fetched; same layout, replace the changed stage files
+- [ ] Data dictionary (`DATA.md`): every table and column, source endpoint, known limits (384 KB search cap, 1000-result query cap, page-100 pagination cap, truncated trees, null merge_commit_sha)
 
 ### Refactoring
 
 - [x] Split scripts so API caching and business logic are decoupled (one stage DB per stage)
+- [x] Scripts renumbered 00 (restore) to 09; no CLI, constants at the top of each script
