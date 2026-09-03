@@ -80,7 +80,7 @@ pcb_project_scout/
 
 ### Further filtering
 - [x] Repo activity stats, all ~40k repos (done 2026-09-03: 39895 fetched, 7 not found, 1597 GraphQL queries). GraphQL returns default-branch commit count, PR count total and merged, issue count, isFork, isArchived, pushedAt, stars. About 400 to 800 requests, one token finishes within an hour. Caching unchanged: raw JSON keyed by query + variables in SQLite.
-- [ ] Improvement history for every candidate repo (started 2026-09-03, shortlisted and qualified repos first): for every qualified project dir fetch `commits?path=<project_dir>` to get the commit sequence touching that project; for every PR fetch `files` to see whether kicad_pcb / kicad_sch changed; full issue list. REST API, cost scales with the shortlist.
+- [x] Improvement history for every candidate repo (done 2026-09-03: 321k requests, 964k commits, 140k PRs with 3.45M changed files, 238k issues, 24.6 GB cache): for every qualified project dir fetch `commits?path=<project_dir>` to get the commit sequence touching that project; for every PR fetch `files` to see whether kicad_pcb / kicad_sch changed; full issue list. REST API, cost scales with the shortlist.
 - [ ] Link commits / PRs / issues to project dirs and produce an "improvement event" table: tree sha before and after, changed files, PR or issue text. Benchmark tasks are picked from here: the before state is the input, the after state is the reference answer.
 - [ ] Publish a release
 

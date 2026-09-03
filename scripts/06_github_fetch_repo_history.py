@@ -48,9 +48,20 @@ CACHE_DIR = Path("data/cache/github_repo_history")
 DB_PATH = CACHE_DIR / "state.sqlite"
 SCHEMA_VERSION = 1
 
-# diff_too_large: observed HTTP 422 "this diff is taking too long to generate" on pulls/{n}/files; permanent
-# for that PR, so it is cached and the repo can still finish.
-CACHEABLE_FAILURE_STATUSES = {"not_found", "empty_repo", "unavailable_legal", "access_blocked", "diff_too_large"}
+# Terminal failures observed on this stage, cached so the repo can still finish:
+#   diff_too_large:   HTTP 422 "this diff is taking too long to generate" on pulls/{n}/files
+#   diff_unavailable: HTTP 422 "problem generating this diff. The repository may be missing relevant data"
+#   pagination_limit: HTTP 422 "Pagination with the page parameter is not supported for large datasets"
+#                     (GitHub stops page-number pagination at page 100 = 10k items; the listing ends there)
+CACHEABLE_FAILURE_STATUSES = {
+    "not_found",
+    "empty_repo",
+    "unavailable_legal",
+    "access_blocked",
+    "diff_too_large",
+    "diff_unavailable",
+    "pagination_limit",
+}
 
 
 @dataclass(frozen=True)
@@ -171,6 +182,10 @@ def failure_status(status_code: int, headers: dict[str, str], data: Any) -> str:
         return "unavailable_legal"
     if status_code == 422 and "diff is taking too long" in message:
         return "diff_too_large"
+    if status_code == 422 and "problem generating this diff" in message:
+        return "diff_unavailable"
+    if status_code == 422 and "pagination with the page parameter is not supported" in message:
+        return "pagination_limit"
     if is_rate_limit_response(status_code, headers, message):
         return "retryable_error"
     if status_code >= 500 or status_code in {429, 422}:
