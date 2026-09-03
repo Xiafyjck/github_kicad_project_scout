@@ -15,6 +15,7 @@ from typing import Any
 CANDIDATES_DB_PATH = Path("data/cache/github_candidates/state.sqlite")
 FILTER_DB_PATH = Path("data/cache/filter_kicad_projects/state.sqlite")
 HISTORY_DB_PATH = Path("data/cache/github_repo_history/state.sqlite")
+COMMIT_FILES_DB_PATH = Path("data/cache/github_commit_files/state.sqlite")  # stage 08, optional
 CACHE_DIR = Path("data/cache/improvement_events")
 DB_PATH = CACHE_DIR / "state.sqlite"
 SCHEMA_VERSION = 1
@@ -24,7 +25,7 @@ ISSUE_REF_RE = re.compile(r"(?<![\w/])#(\d+)\b")
 CLOSING_REF_RE = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)\b", re.IGNORECASE)
 EVENT_RULE = {
     "pull_request": "PR whose changed files include a .kicad_pcb/.kicad_sch/.kicad_pro file; one event per (PR, project dir); before = base sha, after = merge commit sha when GitHub reports one, else head sha",
-    "commit": "commit listed by commits?path=<qualified project dir>; before = first parent, after = the commit; changed files unknown (files_known = 0)",
+    "commit": "commit listed by commits?path=<qualified project dir>; before = first parent, after = the commit; changed files from stage 08 when fetched (files_known = 1), else unknown (0)",
     "project_dir": "deepest qualified project dir containing the file (in_qualified_project = 1), else the file's own directory (0)",
     "linked_issues": "#N references in title/body that resolve to a non-PR issue of the same repo; closing keywords tracked separately",
 }
@@ -100,6 +101,23 @@ def setup_db() -> sqlite3.Connection:
               primary key (repo_id, number)
             );
 
+            -- commit_files: one row per changed file of a stage 08 fetched commit; patch text stays in the
+            -- stage 08 api_cache row referenced by api_cache_id.
+            create table if not exists commit_files (
+              repo_id integer not null,
+              sha text not null,
+              filename text not null,
+              status text,
+              additions integer,
+              deletions integer,
+              changes integer,
+              blob_sha text,
+              previous_filename text,
+              patch_length integer not null,
+              api_cache_id integer not null,
+              primary key (repo_id, sha, filename)
+            );
+
             -- pull_request_files: one row per changed file; the patch text stays in the stage 06 api_cache
             -- row referenced by api_cache_id.
             create table if not exists pull_request_files (
@@ -168,6 +186,7 @@ def setup_db() -> sqlite3.Connection:
             create index if not exists idx_events_repo on improvement_events(repo_id, project_dir);
             create index if not exists idx_events_kind on improvement_events(kind, merged, in_qualified_project);
             create index if not exists idx_prf_repo on pull_request_files(repo_id, number);
+            create index if not exists idx_cf_repo on commit_files(repo_id, sha);
             """
         )
         db.executemany(
@@ -177,6 +196,7 @@ def setup_db() -> sqlite3.Connection:
                 ("candidates_db", str(CANDIDATES_DB_PATH)),
                 ("filter_db", str(FILTER_DB_PATH)),
                 ("history_db", str(HISTORY_DB_PATH)),
+                ("commit_files_db", str(COMMIT_FILES_DB_PATH)),
                 ("event_rule_json", json.dumps(EVENT_RULE, ensure_ascii=False)),
                 ("kicad_suffixes_json", json.dumps(list(KICAD_SUFFIXES))),
             ],
@@ -228,14 +248,34 @@ def load_repo_pages(history: sqlite3.Connection, repo_id: int) -> dict[str, dict
     return pages
 
 
+def load_commit_files(commit_files_db: sqlite3.Connection | None, repo_id: int) -> dict[str, list[tuple[int, dict[str, Any]]]]:
+    # {sha: [(api_cache_id, file)]} for every commit stage 08 fetched with HTTP 200 for this repo.
+    files: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    if commit_files_db is None:
+        return files
+    for row in commit_files_db.execute(
+        """
+        select p.sha, p.page, p.api_cache_id, a.response_json
+        from commit_pages p join api_cache a on a.id = p.api_cache_id
+        where p.repo_id = ? and p.status_code = 200
+        order by p.sha, p.page
+        """,
+        (repo_id,),
+    ):
+        data = json.loads(row["response_json"])
+        files.setdefault(row["sha"], []).extend((int(row["api_cache_id"]), f) for f in data.get("files") or [])
+    return files
+
+
 def build_repo(
     repo: dict[str, Any],
     project_dirs: list[str],
     pages: dict[str, dict[str, list[tuple[int, int, Any]]]],
+    commit_files: dict[str, list[tuple[int, dict[str, Any]]]],
 ) -> dict[str, list[tuple[Any, ...]]]:
     repo_id = repo["repo_id"]
     dirs_by_depth = sorted(project_dirs, key=lambda d: -len(d))
-    out: dict[str, list[tuple[Any, ...]]] = {"commits": [], "commit_touches": [], "pull_requests": [], "pull_request_files": [], "issues": [], "events": []}
+    out: dict[str, list[tuple[Any, ...]]] = {"commits": [], "commit_touches": [], "pull_requests": [], "pull_request_files": [], "commit_files": [], "issues": [], "events": []}
 
     commits: dict[str, dict[str, Any]] = {}
     for subject, page_list in pages.get("commits", {}).items():
@@ -340,6 +380,20 @@ def build_repo(
                         )
                     )
 
+    kicad_by_commit: dict[str, list[dict[str, Any]]] = {}
+    file_count_by_commit: dict[str, int] = {}
+    for sha, entries in commit_files.items():
+        file_count_by_commit[sha] = len(entries)
+        for cache_id, f in entries:
+            filename = f.get("filename") or ""
+            patch = f.get("patch") or ""
+            out["commit_files"].append(
+                (repo_id, sha, filename, f.get("status"), f.get("additions"), f.get("deletions"), f.get("changes"), f.get("sha"), f.get("previous_filename"), len(patch), cache_id)
+            )
+            suffix = kicad_suffix(filename)
+            if suffix is not None:
+                kicad_by_commit.setdefault(sha, []).append({"path": filename, "status": f.get("status"), "suffix": suffix, "additions": f.get("additions"), "deletions": f.get("deletions"), "blob_sha": f.get("sha")})
+
     seen_commit_events: set[tuple[str, str]] = set()
     for subject, page_list in pages.get("commits", {}).items():
         # subject '' is both the whole-repo listing (repos with no qualified dir) and a root-level project;
@@ -357,13 +411,21 @@ def build_repo(
                 title, _, body = message.partition("\n")
                 refs, closing = resolve_refs(message)
                 parent = c["parents"][0] if c["parents"] else None
+                files_known = int(sha in file_count_by_commit)
+                changed = [f for f in kicad_by_commit.get(sha, []) if subject == "" or f["path"].startswith(subject + "/")]
                 out["events"].append(
                     (
                         repo_id, repo["repo_full_name"], subject, 1, "commit", None, sha,
                         title.strip(), body.strip(), c["author_login"], c["author_date"], None, 0,
                         parent, sha,
                         (commits.get(parent) or {}).get("tree_sha") if parent else None, c["tree_sha"],
-                        0, None, None, None, None, None, json.dumps(refs), json.dumps(closing), c["html_url"],
+                        files_known,
+                        file_count_by_commit.get(sha) if files_known else None,
+                        sum(1 for f in changed if f["suffix"] == ".kicad_pcb") if files_known else None,
+                        sum(1 for f in changed if f["suffix"] == ".kicad_sch") if files_known else None,
+                        sum(1 for f in changed if f["suffix"] == ".kicad_pro") if files_known else None,
+                        json.dumps(changed, ensure_ascii=False) if files_known else None,
+                        json.dumps(refs), json.dumps(closing), c["html_url"],
                     )
                 )
     return out
@@ -374,6 +436,7 @@ INSERTS = {
     "commit_touches": "insert or replace into commit_touches values (?,?,?)",
     "pull_requests": "insert or replace into pull_requests values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     "pull_request_files": "insert or replace into pull_request_files values (?,?,?,?,?,?,?,?,?,?,?)",
+    "commit_files": "insert or replace into commit_files values (?,?,?,?,?,?,?,?,?,?,?)",
     "issues": "insert or replace into issues values (?,?,?,?,?,?,?,?,?,?,?,?)",
     "events": """insert or replace into improvement_events (
         repo_id, repo_full_name, project_dir, in_qualified_project, kind, number, sha,
@@ -395,15 +458,18 @@ def build_improvement_events() -> dict[str, Any]:
             project_dirs.setdefault(int(row["repo_id"]), []).append(str(row["project_dir"]))
 
     totals = {key: 0 for key in INSERTS}
+    commit_files_db = open_ro(COMMIT_FILES_DB_PATH) if COMMIT_FILES_DB_PATH.exists() else None
+    print(f"commit files db: {'present' if commit_files_db else 'absent'} ({COMMIT_FILES_DB_PATH})", flush=True)
     with closing(setup_db()) as db, closing(open_ro(HISTORY_DB_PATH)) as history:
         with db:
-            for table in ("commits", "commit_touches", "pull_requests", "pull_request_files", "issues", "improvement_events"):
+            for table in ("commits", "commit_touches", "pull_requests", "pull_request_files", "commit_files", "issues", "improvement_events"):
                 db.execute(f"delete from {table}")
         for index, repo in enumerate(repos, start=1):
             pages = load_repo_pages(history, int(repo["repo_id"]))
             if not pages:
                 continue
-            out = build_repo(repo, project_dirs.get(int(repo["repo_id"]), []), pages)
+            commit_files = load_commit_files(commit_files_db, int(repo["repo_id"]))
+            out = build_repo(repo, project_dirs.get(int(repo["repo_id"]), []), pages, commit_files)
             with db:
                 for key, rows in out.items():
                     if rows:
@@ -419,7 +485,11 @@ def build_improvement_events() -> dict[str, Any]:
                 "event_repo_count": db.execute("select count(distinct repo_id) from improvement_events").fetchone()[0],
                 "pr_events_with_linked_issue": db.execute("select count(*) from improvement_events where kind='pull_request' and linked_issues_json != '[]'").fetchone()[0],
                 "pr_events_with_pcb_change": db.execute("select count(*) from improvement_events where kind='pull_request' and kicad_pcb_count > 0").fetchone()[0],
+                "commit_events_files_known": db.execute("select count(*) from improvement_events where kind='commit' and files_known = 1").fetchone()[0],
+                "commit_events_with_pcb_change": db.execute("select count(*) from improvement_events where kind='commit' and kicad_pcb_count > 0").fetchone()[0],
             }
+    if commit_files_db is not None:
+        commit_files_db.close()
     return {"schema_version": SCHEMA_VERSION, "db_path": str(DB_PATH), "built_at": built_at, "repo_count": len(repos), "row_counts": totals, **summary_rows}
 
 
