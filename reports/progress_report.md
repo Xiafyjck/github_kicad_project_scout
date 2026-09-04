@@ -2,7 +2,7 @@
 
 日期：2026-09-04
 
-**背景与术语**
+**背景**
 
 设计一块电路板要用 EDA 软件，KiCad 是最流行的开源 EDA 软件。一个 KiCad 工程由三类核心文件组成：
 
@@ -14,15 +14,41 @@
 
 2021 年底发布的 KiCad 6 引入了这套后缀；更早的版本原理图用 `.sch`，与其他软件的后缀相同。
 
-GitHub 是代码托管平台。一个仓库（repo）是一个项目；提交（commit）是一次保存的改动；PR（pull request）是一次带说明的改动提议，合并后进入正式版本；issue 是问题或需求讨论帖。
-
 项目仓库地址：https://github.com/Xiafyjck/github_kicad_project_scout
 
 数据集地址：https://modelscope.cn/datasets/Mask2X/pcb-project-scout
 
 **目标**
 
-找出 GitHub 上所有开源 PCB 工程，并从中提取"一次有说明的 PCB 设计改进"，用于制作 benchmark，评测 AI 修改电路的能力：改动前的工程是输入，改动后的工程是参考答案，PR 或 issue 里的文字是题面。
+基于NL2repo-Bench[https://arxiv.org/pdf/2512.12730v2] 制作NL2PCB，根据自然语言从零构建PCB项目
+
+区别于swebench的点：
+
+|          | SWE-Bench        | NL2repo-Bench    |
+| -------- | ---------------- | ---------------- |
+| 基本单位 | PR               | repo             |
+| 题面     | issue            | **需求文档**     |
+| 输入     | PR前的仓库代码   | 空白工作区       |
+| 参考答案 | PR后的仓库代码   | 整个仓库代码     |
+| 验证器   | PR附带的单元测试 | 整合所有单元测试 |
+
+NL2repo -> NL2PCB
+
+|        | NL2repo-Bench                             | NL2PCB-Bench                                   |
+| ------ | ----------------------------------------- | ---------------------------------------------- |
+| 输入   |                                           | Kicad 环境 + 元件参考资料                      |
+| 验证器 | 整合所有单元测试（要求AI必须实现指定API） | 专家构建，跨项目通用（要求AI必须命名特定线路） |
+| 规模   | 104                                       |                                                |
+
+可面向computer use？
+
+https://openai.com/index/gpt-6-astra/
+
+**第一步**
+
+找出 GitHub 上所有开源 PCB 工程，并从中提取"一次有说明的 PCB 设计修改"
+
+![image-20260904120654993](/Users/xiafuyuan/Library/Application Support/typora-user-images/image-20260904120654993.png)
 
 **方法**
 
