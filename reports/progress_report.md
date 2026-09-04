@@ -102,12 +102,12 @@ flowchart TB
 
     C[候选仓库 69181]:::keep --> A[分析仓库 39902]:::keep --> Q[完整工程仓库 32029<br/>工程目录 66793]:::keep --> E[改进事件 523908]:::keep
     C -.-> CX([未分析 29279]):::exit
-    A -.-> AX([已删除 4 / 截断 21 / 无完整目录 7848]):::exit
+    A -.-> AX([删除 4 / 截断 21 / 不完整 7848]):::exit
     E --> P[PR 事件 33844]:::keep
     E --> M[commit 事件 490064]:::keep
 
     P --> P3[底线 12152]:::keep --> P4[文字 3534]:::keep --> P5[规模 1066]:::keep --> P6[全为修改 855]:::keep --> P7[有 patch 511]:::keep --> P8[真实改动 328]:::keep --> P9[限额 283]:::keep
-    P -.-> PX0([KiCad 文件不在完整工程目录内 17472 / 未合并 2172 / 只改 sch·pro 2048]):::exit
+    P -.-> PX0([目录不完整 17472 / 未合并 2172 / 只改 sch·pro 2048]):::exit
     P3 -.-> PX4([8618]):::exit
     P4 -.-> PX5([2468]):::exit
     P5 -.-> PX6([211]):::exit
@@ -116,7 +116,7 @@ flowchart TB
     P8 -.-> PX9([45]):::exit
 
     M --> M3[底线 275885]:::keep --> M4[文字 23086]:::keep --> M5[规模 10456]:::keep --> M6[全为修改 8444]:::keep --> M7[有 patch 4398]:::keep --> M8[真实改动 3957]:::keep --> M9[限额 3416]:::keep
-    M -.-> MX0([只改 sch·pro 或无 KiCad 文件 214179]):::exit
+    M -.-> MX0([无 pcb 改动 214179]):::exit
     M3 -.-> MX4([252799]):::exit
     M4 -.-> MX5([12630]):::exit
     M5 -.-> MX6([2012]):::exit
@@ -143,24 +143,24 @@ flowchart TB
     classDef rule fill:#fff8dc,stroke:#c9a400,color:#333
     classDef final fill:#e6f7e6,stroke:#2e8b57,color:#111
 
-    L1[限制：只索引 384 KB 以下文件，.kicad_pro 最可靠]:::rule
-    L2[限制：单条查询 ≤ 1000 条，按 size 二分区间]:::rule
+    L1[只索引 ≤ 384 KB 文件]:::rule
+    L2[单查 ≤ 1000 条，按 size 二分]:::rule
     subgraph S[四路搜索]
         direction TB
-        K1[kicad_pro：39902 仓库，3224 区间]:::src
-        K2[kicad_pcb：26676 仓库，2602 区间]:::src
-        K3[kicad_sch：37202 仓库，4604 区间]:::src
-        K4[sch：30515 仓库，8914 区间]:::src
+        K1[kicad_pro 39902]:::src
+        K2[kicad_pcb 26676]:::src
+        K3[kicad_sch 37202]:::src
+        K4[sch 30515]:::src
     end
     L1 --> S
     L2 --> S
-    S --> C[候选仓库 69181，四路并集]:::keep
+    S --> C[候选仓库 69181]:::keep
     C --> C6[KiCad 6+ 候选 50796]:::keep
-    C6 --> A[分析仓库 39902，第一版 kicad_pro 命中]:::keep
+    C6 --> A[分析仓库 39902]:::keep
     C6 -.-> CX([未分析 29279]):::exit
-    A --> T[Tree API 拉整仓库文件列表]:::rule
-    T --> R[工程目录：同目录 pro + pcb + sch，就近有 README，按 HEAD 判]:::rule
-    R --> Q[完整工程仓库 32029，工程目录 66793]:::keep
+    A --> T[拉文件树]:::rule
+    T --> R[同目录 pro+pcb+sch，有 README]:::rule
+    R --> Q[完整工程仓库 32029<br/>工程目录 66793]:::keep
     T -.-> AX1([已删除 4]):::exit
     T -.-> AX2([文件树截断 21]):::exit
     R -.-> AX3([无完整目录 7848]):::exit
@@ -182,29 +182,29 @@ flowchart TB
     Q[分析仓库 39902]:::keep
     subgraph H[拉取六类原始响应，全部缓存]
         direction TB
-        H0[活跃度 GraphQL：39895 仓库]:::src
-        H1[按目录查提交：89.7 万 commit]:::src
-        H2[PR：140678]:::src
-        H3[PR 改动文件：345 万，含逐行差异]:::src
-        H4[issue：97849，已去 PR]:::src
-        H5[commit 改动文件：42.3 万 commit，887 万文件]:::src
+        H0[活跃度 39895 仓库]:::src
+        H1[提交列表 89.7 万]:::src
+        H2[PR 14.1 万]:::src
+        H3[PR 改动文件 345 万]:::src
+        H4[issue 9.8 万]:::src
+        H5[commit 改动文件 887 万]:::src
     end
     Q --> H
-    H --> E[改进事件 523908 = 一次改动 × 一个工程目录]:::keep
-    E --> D[每条记：KiCad 文件与状态、增删行、pcb / sch / pro 数、总文件数、引用的 issue]:::rule
-    D --> PR[PR 事件：改了 KiCad 文件才记，按文件所在目录分条；前 = base 提交，后 = 合并提交]:::rule
-    D --> CM[commit 事件：目录下任意文件改动都记；前 = 父提交，后 = 自身]:::rule
-    PR --> P[PR 事件 33844 = 18348 个 PR]:::keep
-    CM --> M[commit 事件 490064 = 423293 个 commit]:::keep
+    H --> E[改进事件 523908<br/>一次改动 × 一个工程目录]:::keep
+    E --> D[记：KiCad 文件与状态、增删行、引用的 issue]:::rule
+    D --> PR[PR 事件：改了 KiCad 文件才记<br/>前 base，后合并提交]:::rule
+    D --> CM[commit 事件：目录下任意改动都记<br/>前父提交，后自身]:::rule
+    PR --> P[PR 事件 33844]:::keep
+    CM --> M[commit 事件 490064]:::keep
 
-    P --> P1[底线一：目录是完整工程目录，剩 16372]:::keep
-    P1 -.-> PX1([目录在 HEAD 上不完整 17472]):::exit
-    P1 --> P2[底线二：已合并，剩 14200]:::keep
+    P --> P1[在完整工程目录 16372]:::keep
+    P1 -.-> PX1([目录不完整 17472]):::exit
+    P1 --> P2[已合并 14200]:::keep
     P2 -.-> PX2([未合并 2172]):::exit
-    P2 --> P3[底线三：改了 .kicad_pcb，剩 12152 = 8719 PR，3022 仓库]:::keep
+    P2 --> P3[改了 pcb 12152<br/>= 8719 PR]:::keep
     P3 -.-> PX3([只改 sch / pro 2048]):::exit
-    M --> M3[底线三：改了 .kicad_pcb，剩 275885 = 237928 commit]:::keep
-    M3 -.-> MX3([无 KiCad 文件 142900，只改 sch / pro 71279]):::exit
+    M --> M3[改了 pcb 275885<br/>= 237928 commit]:::keep
+    M3 -.-> MX3([无 KiCad 文件 142900<br/>只改 sch / pro 71279]):::exit
 ```
 
 讲解：上半是拉取。对分析仓库拉六类原始响应并全部缓存：GraphQL 一次查 25 个仓库拿活跃度；按每个工程目录查提交列表，去重后 897459 个 commit；全部 PR 140678 个；每个 PR 的改动文件 345 万条，接口自带逐行差异；全部 issue 去掉 PR 后 97849 个；再对触及工程目录的 42.3 万个 commit 逐个拉改动文件，共 887 万条。中间是构事件。事件定义为一次改动 × 一个工程目录，但 PR 与 commit 的入选条件不同：PR 事件只在 PR 改了至少一个 KiCad 文件时产生，按 KiCad 文件所在的工程目录分条，改动前是 base 提交、改动后是合并提交；commit 事件来自按目录查询的提交列表，目录下任意文件改动都会入选，README、gerber 也算，改动前是第一个父提交、改动后是它自己。每条事件记录落在该目录的 KiCad 文件清单与状态、增删行、pcb / sch / pro 各几个、总改动文件数、说明文字引用的 issue。共 523908 个事件，PR 事件 33844 个对应 18348 个 KiCad PR，commit 事件 490064 个对应 423293 个 commit。下半是底线。PR 支路依次筛：KiCad 文件所在目录是完整工程目录（筛掉 17472，这些仍是 KiCad 改动，只是目录在 HEAD 上不完整）、PR 已合并（筛掉 2172）、改了 .kicad_pcb（筛掉只改 sch / pro 的 2048），剩 12152 个底线 PR 事件，对应 8719 个 PR、3022 个仓库。commit 支路只筛"改了 .kicad_pcb"，筛掉 214179 条（无 KiCad 文件 142900 加只改 sch / pro 71279），剩 275885 个底线 commit 事件，对应 237928 个 commit、31972 个仓库。
@@ -221,16 +221,16 @@ flowchart TB
     classDef final fill:#e6f7e6,stroke:#2e8b57,color:#111
 
     P3[底线 PR 事件 12152]:::keep
-    P3 --> Rb[文字筛：清洗后 ≥ 100 字]:::rule
+    P3 --> Rb[文字 ≥ 100 字]:::rule
     Rb --> P4[剩 3534]:::keep
-    P4 --> Rc[规模筛：KiCad 增删行 ≤ 8000，文件 ≤ 40]:::rule
+    P4 --> Rc[增删行 ≤ 8000，文件 ≤ 40]:::rule
     Rc --> P5[剩 1066]:::keep
-    P5 --> Rd[修改筛：KiCad 文件全为 modified]:::rule
+    P5 --> Rd[全为 modified]:::rule
     Rd --> P6[剩 855]:::keep
-    P6 --> Re[存盘筛：有 patch，去 uuid / tstamp / version 行后真实改动 ≥ 5]:::rule
+    P6 --> Re[去 uuid / 版本行后 ≥ 5 行]:::rule
     Re --> P7[有 patch 511]:::keep
     P7 --> P8[真实改动 328]:::keep
-    P8 --> Rf[限额筛：每仓库 ≤ 20]:::rule
+    P8 --> Rf[每仓库 ≤ 20]:::rule
     Rf --> P9[剩 283]:::keep
 
     subgraph TX[文字不合格 8618，可重叠]
@@ -242,8 +242,8 @@ flowchart TB
     end
     Rb -.-> TX
     Rc -.-> PX5([过大 2468]):::exit
-    Rd -.-> PX6([含新增 / 改名 / 删除 211]):::exit
-    Re -.-> PX7([无 patch 344，C 级]):::exit
+    Rd -.-> PX6([新增 / 改名 / 删除 211]):::exit
+    Re -.-> PX7([无 patch 344, C]):::exit
     P7 -.-> PX8([只存盘 183]):::exit
     Rf -.-> PX9([超限额 45]):::exit
 ```
@@ -261,7 +261,7 @@ flowchart TB
     classDef rule fill:#fff8dc,stroke:#c9a400,color:#333
     classDef final fill:#e6f7e6,stroke:#2e8b57,color:#111
 
-    M3[底线 commit 事件 275885，筛法同图 3]:::keep
+    M3[底线 commit 事件 275885]:::keep
     M3 --> M4[文字筛后 23086]:::keep
     M4 --> M5[规模筛后 10456]:::keep
     M5 --> M6[修改筛后 8444]:::keep
@@ -277,17 +277,17 @@ flowchart TB
     end
     M4 -.-> TY
     M5 -.-> MX5([过大 12630]):::exit
-    M6 -.-> MX6([含新增 / 改名 / 删除 2012]):::exit
-    M7 -.-> MX7([无 patch 4046，C 级]):::exit
+    M6 -.-> MX6([新增 / 改名 / 删除 2012]):::exit
+    M7 -.-> MX7([无 patch 4046, C]):::exit
     M8 -.-> MX8([只存盘 441]):::exit
     M9 -.-> MX9([超限额 541]):::exit
 
     P9[PR 支路 283]:::keep
-    M9 --> F[最终池 3699，1441 仓库]:::final
+    M9 --> F[最终池 3699<br/>1441 仓库]:::final
     P9 --> F
-    F --> G[A 级 200：引用了本仓库 issue]:::final
+    F --> G[A 级 200，引用 issue]:::final
     F -.-> FB([B 级 3499]):::exit
-    MX7 -.-> FC([C 级合计 4390，待取完整文件]):::exit
+    MX7 -.-> FC([C 级 4390 待定]):::exit
 ```
 
 讲解：commit 支路筛法与图 3 相同，文字取提交标题加正文。从 275885 个底线 commit 事件开始：文字筛筛掉 252799，其中 252743 是只有一行标题，这是整条流水线损失最大的一步，说明提交里大多数没有可以当题面的说明；剩 23086。规模筛筛掉 12630，剩 10456。修改筛筛掉 2012，剩 8444。无 patch 的 4046 条记 C 级，剩 4398；只存盘 churn 441 条筛掉，剩 3957。限额筛掉 541，剩 3416。commit 支路的 3416 与 PR 支路的 283 合并成最终池 3699 个事件、1441 个仓库。最终池按说明文字是否引用了本仓库 issue 分级：引用了的 200 条为 A 级，来自 57 个仓库，题面最完整；其余 3499 条为 B 级。两支的 C 级合计 4390 条，等取回完整文件后再判断语义。
