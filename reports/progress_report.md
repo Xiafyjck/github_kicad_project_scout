@@ -88,26 +88,63 @@ GitHub 是代码托管平台。一个仓库（repo）是一个项目；提交（
 | A 级事件 | 最终池中说明文字明确引用了本仓库 issue 的 | 200 个事件，57 个仓库 |
 | issue | GitHub 的 issue 接口把 PR 也算作 issue；本报告说的 issue 均已去掉 PR | 97849 个（接口返回 238233 条） |
 
-筛网图分四张，按阶段读。实线主干是每层保留的集合，虚线分叉是筛掉的部分和原因，黄色框是该层的方法与口径批注。图 1 数字为仓库数，图 2 到图 4 为事件数。
+筛网图：图 0 是无批注的全景，图 1 到图 4 按阶段展开并带简短批注。实线主干是每层保留的集合，虚线分叉是筛掉的部分和原因。图 0、图 1 的仓库层为仓库数，其余为事件数。
+
+图 0：全景
+
+```mermaid
+flowchart TB
+    classDef exit fill:#f4f4f4,stroke:#999,color:#555
+    classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
+    classDef final fill:#e6f7e6,stroke:#2e8b57,color:#111
+
+    C[候选仓库 69181]:::keep --> A[分析仓库 39902]:::keep --> Q[完整工程仓库 32029<br/>工程目录 66793]:::keep --> E[改进事件 523908]:::keep
+    C -.-> CX([未分析 29279]):::exit
+    A -.-> AX([已删除 4 / 截断 21 / 无完整目录 7848]):::exit
+    E --> P[PR 事件 33844]:::keep
+    E --> M[commit 事件 490064]:::keep
+
+    P --> P3[底线 12152]:::keep --> P4[文字 3534]:::keep --> P5[规模 1066]:::keep --> P6[全为修改 855]:::keep --> P7[有 patch 511]:::keep --> P8[真实改动 328]:::keep --> P9[限额 283]:::keep
+    P -.-> PX0([目录外 17472 / 未合并 2172 / 只改 sch·pro 2048]):::exit
+    P3 -.-> PX4([8618]):::exit
+    P4 -.-> PX5([2468]):::exit
+    P5 -.-> PX6([211]):::exit
+    P6 -.-> PX7([344 C 级]):::exit
+    P7 -.-> PX8([183]):::exit
+    P8 -.-> PX9([45]):::exit
+
+    M --> M3[底线 275885]:::keep --> M4[文字 23086]:::keep --> M5[规模 10456]:::keep --> M6[全为修改 8444]:::keep --> M7[有 patch 4398]:::keep --> M8[真实改动 3957]:::keep --> M9[限额 3416]:::keep
+    M -.-> MX0([只改 sch·pro 或无 KiCad 文件 214179]):::exit
+    M3 -.-> MX4([252799]):::exit
+    M4 -.-> MX5([12630]):::exit
+    M5 -.-> MX6([2012]):::exit
+    M6 -.-> MX7([4046 C 级]):::exit
+    M7 -.-> MX8([441]):::exit
+    M8 -.-> MX9([541]):::exit
+
+    P9 --> F[最终池 3699<br/>1441 仓库]:::final
+    M9 --> F
+    F --> G[A 级 200]:::final
+    F -.-> FB([B 级 3499]):::exit
+```
 
 图 1：找仓库、判完整
 
 ```mermaid
 flowchart TB
-    classDef note fill:#fff8dc,stroke:#c9a400,color:#333,text-align:left
+    classDef note fill:#fff8dc,stroke:#c9a400,color:#333
     classDef exit fill:#f4f4f4,stroke:#999,color:#555
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
 
-    N1[/"候选策略：GitHub 代码搜索按后缀分四路搜（.kicad_pro / .kicad_pcb / .kicad_sch / .sch）<br/>接口限制：只索引 384 KB 以下文件、单条查询最多 1000 条<br/>应对：按文件大小二分区间，直到每段可被 10 页枚举<br/>.kicad_pro 最小最可靠；.kicad_pcb 近半超 384 KB，单独用它只能找到 43% 的完整工程<br/>四路按仓库 id 去重取并集；搜索只用来发现仓库，不做判断"/]:::note
-    C[候选仓库 69181<br/>= 四路并集]:::keep
-    C6[KiCad 6+ 候选 50796<br/>= 被前三路任一命中]:::keep
-    A[分析仓库 39902<br/>= 第一版 .kicad_pro 命中<br/>后续所有数字在此集合上统计]:::keep
-    CX([未分析 29279<br/>仅被其余三路命中，待 Release C]):::exit
-
-    N2[/"完整判定：Tree API 一次拉整个仓库的递归文件列表，本地判定<br/>同一目录同时有 .kicad_pro + .kicad_pcb + .kicad_sch，<br/>且本目录、上级目录或仓库根目录有 README，记为一个工程目录<br/>不读文件内容；一个仓库可含多个工程目录"/]:::note
+    N1[/"代码搜索四种后缀，按文件大小二分绕过 1000 条上限，四路并集<br/>搜索只索引 384 KB 以下文件，.kicad_pro 最可靠"/]:::note
+    C[候选仓库 69181<br/>四路并集]:::keep
+    C6[KiCad 6+ 候选 50796<br/>前三路任一命中]:::keep
+    A[分析仓库 39902<br/>第一版 .kicad_pro 命中]:::keep
+    CX([未分析 29279，待 Release C]):::exit
+    N2[/"Tree API 拉整仓库文件列表，本地判定：<br/>同目录有 pro + pcb + sch，且附近有 README"/]:::note
     Q[完整工程仓库 32029（80%）<br/>工程目录 66793]:::keep
     AX1([已删除 4]):::exit
-    AX2([文件树被 GitHub 截断 21<br/>大型杂项集合，放弃]):::exit
+    AX2([文件树被截断 21]):::exit
     AX3([无完整工程目录 7848]):::exit
 
     N1 -.- C
@@ -124,18 +161,18 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    classDef note fill:#fff8dc,stroke:#c9a400,color:#333,text-align:left
+    classDef note fill:#fff8dc,stroke:#c9a400,color:#333
     classDef exit fill:#f4f4f4,stroke:#999,color:#555
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
 
-    N3[/"拉取策略：先全量拉原始响应，判断全在本地<br/>GraphQL 批量拿活跃度；每仓库拉按工程目录查询的提交列表、全部 PR、PR 改动文件（自带逐行差异）、全部 issue<br/>再对触及工程目录的 42.3 万 commit 逐个拉改动文件，与 PR 同样的文件明细"/]:::note
-    N4[/"事件定义：一次改动 × 一个工程目录，一个 PR 改 3 个目录记 3 条<br/>PR 事件：前 = base commit，后 = merge commit（缺则 PR 分支头）<br/>commit 事件：前 = 第一个父提交，后 = 自身<br/>每条记 KiCad 文件清单与状态、增删行、pcb / sch / pro 计数、#N 引用并确认存在的 issue"/]:::note
-    N5[/"底线：落在工程目录内、PR 已合并（commit 不要求）、至少改了一个 .kicad_pcb"/]:::note
+    N3[/"全量拉原始响应，判断在本地：<br/>按目录查提交、全部 PR 及其改动文件、全部 issue，再补 42.3 万 commit 的改动文件"/]:::note
+    N4[/"事件 = 一次改动 × 一个工程目录<br/>PR：前 base，后 merge；commit：前父提交，后自身"/]:::note
+    N5[/"底线：工程目录内、PR 已合并、改了 .kicad_pcb"/]:::note
 
     Q[完整工程仓库 32029]:::keep
     E[改进事件 523908]:::keep
-    P[PR 事件 33844<br/>= 18348 个 KiCad PR，4418 仓库<br/>KiCad PR：改动文件含任一 KiCad 文件，不限目录、不限是否合并]:::keep
-    M[commit 事件 490064<br/>= 423293 个工程目录提交]:::keep
+    P[PR 事件 33844<br/>= 18348 个 KiCad PR]:::keep
+    M[commit 事件 490064<br/>= 423293 个 commit]:::keep
     P1[目录内 16372]:::keep
     P2[已合并 14200]:::keep
     P3[底线 PR 事件 12152<br/>= 8719 个 PR，3022 仓库]:::keep
@@ -164,15 +201,15 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    classDef note fill:#fff8dc,stroke:#c9a400,color:#333,text-align:left
+    classDef note fill:#fff8dc,stroke:#c9a400,color:#333
     classDef exit fill:#f4f4f4,stroke:#999,color:#555
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
 
-    Nb[/"文字筛，管有没有题面：标题 + 正文去掉 checklist、HTML 注释、引用、签名后 ≥ 100 字<br/>PR 模板、TODO 清单、只有 issue 号或链接的不算"/]:::note
-    Nc[/"规模筛，管是不是一次可理解的修改：KiCad 文件增删行合计 ≤ 8000、改动文件 ≤ 40<br/>一次小布局改动就改写上千行，阈值故意放宽"/]:::note
-    Nd[/"修改筛，管前后状态能否对上：所有 KiCad 文件状态为 modified<br/>新增无前状态，改名 / 删除对不上文件"/]:::note
-    Ne[/"存盘筛，管是不是真改了电路：逐行差异里 uuid / tstamp / version / generator 行不算，其余真实改动行 ≥ 5<br/>无逐行差异的记 C 级待定（GitHub 对过大文件不返回 patch）"/]:::note
-    Nf[/"限额筛，管少数仓库垄断：每仓库最多 20 条，先取有 issue 关联的，再按说明长度"/]:::note
+    Nb[/"文字：清洗后 ≥ 100 字，非模板 / TODO / 纯编号"/]:::note
+    Nc[/"规模：KiCad 增删行 ≤ 8000，改动文件 ≤ 40"/]:::note
+    Nd[/"修改：KiCad 文件全为 modified"/]:::note
+    Ne[/"存盘：去掉 uuid / tstamp / version 行后真实改动 ≥ 5 行"/]:::note
+    Nf[/"限额：每仓库 ≤ 20，优先有 issue、说明长"/]:::note
 
     P3[底线 PR 事件 12152]:::keep
     P4[文字合格 3534]:::keep
@@ -206,13 +243,13 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    classDef note fill:#fff8dc,stroke:#c9a400,color:#333,text-align:left
+    classDef note fill:#fff8dc,stroke:#c9a400,color:#333
     classDef exit fill:#f4f4f4,stroke:#999,color:#555
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
     classDef final fill:#e6f7e6,stroke:#2e8b57,color:#111
 
-    Ng[/"五道筛规则与图 3 相同；commit 的说明文字 = 提交标题 + 正文，多数只有一行标题，文字筛损失最大"/]:::note
-    Nh[/"出口分级：A 级 = 全部通过且说明文字引用了本仓库 issue；B 级 = 全部通过；<br/>C 级 = 文字 / 规模 / 修改通过但无逐行差异，待取完整文件判断<br/>issue 口径：GitHub 把 PR 也算 issue，本报告的 97849 已去掉 PR"/]:::note
+    Ng[/"筛法同图 3；commit 多数只有一行标题，文字筛损失最大"/]:::note
+    Nh[/"A 级 = 全过且引用本仓库 issue；B 级 = 全过；C 级 = 无 patch 待定"/]:::note
 
     M3[底线 commit 事件 275885]:::keep
     M4[文字合格 23086]:::keep
@@ -229,7 +266,7 @@ flowchart TB
     MX9([超限额 541]):::exit
 
     P9[PR 支路限额后 283]:::keep
-    F[最终池 3699 事件<br/>1441 仓库 = PR 283 + commit 3416]:::final
+    F[最终池 3699 事件<br/>1441 仓库]:::final
     G[A 级 200 事件，57 仓库]:::final
     FB([B 级 3499]):::exit
 
@@ -247,7 +284,6 @@ flowchart TB
     F --> G
     F -.-> FB
 ```
-
 
 **结论**
 
