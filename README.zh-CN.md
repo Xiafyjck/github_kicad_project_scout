@@ -39,7 +39,7 @@ uv run scripts/00_restore_cache.py
 5. **发布表导出** `05_release_github_trees.py`。导出 `repos.csv`、`trees.jsonl`、`qualified_repos.csv`、`manifest.json` 到 `data/releases/<date>/` 并打 zip。为 GitHub Release A 保留；ModelScope 数据集已取代它。
 6. **仓库活跃度统计** `06_github_fetch_repo_stats.py`。GitHub GraphQL，每次查询 25 个仓库：默认分支 commit 数、PR 总数与已合并数、issue 数、fork / archived / disabled 标志、parent、pushedAt、stars。原始响应按 query + variables 缓存，每仓库一行 `repo_stats`。
 7. **仓库历史** `07_github_fetch_repo_history.py`。对每个候选仓库拉四类列表的全部分页：每个合格工程目录的 `commits?path=<project_dir>`（无合格目录则拉整库历史）、全部 PR、每个 PR 的改动文件（含 patch）、全部 issue。原始页按 URL + 参数缓存；`listing_pages` 按仓库、类型、主体、页号索引。
-8. **改进事件** `08_build_improvement_events.py`。本地后处理，读 07 与 09 的缓存：`commits`、`commit_touches`、`pull_requests`、`pull_request_files`、`commit_files`、`issues`、`improvement_events`。一个事件是一次带说明的 PCB 改动：改动文件含 `.kicad_pcb` / `.kicad_sch` / `.kicad_pro` 的 PR（每个 PR 与工程目录一条，before = base sha，after = merge 或 head sha），或合格工程目录下列出的 commit（before = 第一个父提交，after = 该 commit）。附带按后缀的文件计数、改动文件清单、`#N` 引用的 issue。
+8. **改进事件** `08_build_improvement_events.py`。本地后处理，读 07 与 09 的缓存：`commits`、`commit_touches`、`pull_requests`、`pull_request_files`、`commit_files`、`issues`、`improvement_events`。一个事件是一次带说明的 PCB 改动：改动文件含 `.kicad_pcb` / `.kicad_sch` / `.kicad_pro` 的 PR（每个 PR 与工程目录一条，before = base sha，after = merge 或 head sha），或合格工程目录下列出且改了该目录 KiCad 文件的 commit（before = 第一个父提交，after = 该 commit）。附带按后缀的文件计数、改动文件清单、`#N` 引用的 issue。
 9. **commit 改动文件** `09_github_fetch_commit_files.py`。对 07 在合格工程目录下列出的每个 commit 拉 `commits/{sha}` 的全部文件页，使 commit 事件与 PR 事件有同样的文件明细。之后重跑 08。
 10. **事件质量** `10_analyze_event_quality.py`。本地。给每个事件打 benchmark 可用性分：文本质量（剔除模板、TODO 列表、纯 issue 编号）、改动规模上限、KiCad 文件全为 modified、从 patch 文本识别只存盘的 churn（uuid / tstamp / version 行与真实改动分开计数）、仓库限额，另附合格仓库的 3D 模型普查。写出 `data/cache/event_quality/state.sqlite` 与报告 `reports/event_quality.md`，以及 issue 驱动事件的种子 CSV。
 
@@ -68,6 +68,23 @@ uv run scripts/10_analyze_event_quality.py
 - **活跃度**。仓库中位数：16 次 commit，0 PR，0 issue，0 star。80% 从未收到 PR，84% 从未有 issue；6897 个仓库（17%）有合并 PR。91% 建于 2022 年之后；67% 最近一年有推送。
 - **历史**。140678 个 PR，其中 18348 个（13%）改动 KiCad 文件，来自 4418 个仓库、5453 位作者；已合并 15483 个。KiCad PR 逐年翻倍（2022 年 1287，2024 年 3016，2025 年 4031，2026 年至今 3871）。423293 个 commit 触及完整工程目录；97849 个 issue。
 - **benchmark 素材**。完整工程内已合并且改了 `.kicad_pcb` 的 PR：8719 个，来自 3022 个仓库，其中说明超过 100 字的 3292 个，关联 issue 的 801 个。改了 `.kicad_pcb` 的 commit 事件 275885 个，其中多行提交说明的 34535 个，正文超过 100 字的 15864 个。每个事件带前后 sha、改动的 KiCad 文件及状态与行数，patch 全文在缓存里。
+
+## 十个示例事件
+
+从最终池（A / B 级）挑选：每条是一次有说明的改动，原理图与布局都动了，改动前后状态一一对应。
+
+| 仓库 | 改动 | 改了什么 |
+|---|---|---|
+| Tinkerbug-Robotics/TinkerRocket | [commit edef97e7](https://github.com/Tinkerbug-Robotics/TinkerRocket/commit/edef97e7cfe0f62e66d90c6e89ba15fb602df408) | 按 JST VH 电池输入重新计算 eFuse 限流电阻，100R 改 127R，依据数据手册；关联 issue #658 |
+| greatscottgadgets/cynthion-hardware | [commit 9f84e603](https://github.com/greatscottgadgets/cynthion-hardware/commit/9f84e60331b9a53fa23bea8aa7e268448d4a9bc2) | 测试表明 ULPI 串联电阻对辐射无改善，改为 0 欧 |
+| v3l0c1r4pt0r/ucm4 | [commit 77b04758](https://github.com/v3l0c1r4pt0r/ucm4/commit/77b04758c1153bfeca18e843d32b71fc71f97494) | TVS 二极管换成 TI 器件，封装改 USON-10 |
+| worlickwerx/pi-cluster-two | [commit b4cad36b](https://github.com/worlickwerx/pi-cluster-two/commit/b4cad36b61249c70ef9f3a4511c5a185b0e4123f) | v3.1 板上测试点丝印标号没出来，修正字段设置使其绘制到丝印层 |
+| DashiellRussell/18650-cell-carriers | [commit 32ce50d9](https://github.com/DashiellRussell/18650-cell-carriers/commit/32ce50d989bf1e01b6f9e1e0f4eb47fda2270419) | 板长缩到 117.4 mm，倒圆角，线焊盘与锡桥两列合并为一个封装 |
+| jalopezg-git/libledmtx | [PR #13](https://github.com/jalopezg-git/libledmtx/pull/13) | 32x8 LED 矩阵驱动板评审修正，含换用电流余量更大的移位寄存器 |
+| MatthiasElectronic/AWG_DHO8-900 | [PR #2](https://github.com/MatthiasElectronic/AWG_DHO8-900/pull/2) | 加封装旋转字段，让 JLCPCB 贴片方向正确 |
+| flohoff/vbus-adapter | [commit 2f14aad9](https://github.com/flohoff/vbus-adapter/commit/2f14aad9af962806a60f4045787c935b95a1f3d8) | 隔离器换成默认低电平型号，掉电时不再把总线拉低，加下拉电阻 |
+| eaguirre12/CUNY-Js5 | [commit e48cdeb3](https://github.com/eaguirre12/CUNY-Js5/commit/e48cdeb3b19f2a4b7889bdd19c922902555c40da) | 删掉未用连接器，USB 连接器改为说明，加热电阻标记为不上 BOM |
+| cajunpanda/gameboy-hifi-audio | [commit b201af75](https://github.com/cajunpanda/gameboy-hifi-audio/commit/b201af75e8ed27f324039df629b385db4026f844) | B 版：ESP32 模组换内置天线型号，放大器输入改交流耦合，去掉两个电阻 |
 
 ## 目录结构
 
@@ -118,7 +135,7 @@ pcb_project_scout/
 ### 后处理
 
 - [x] 初筛：有完整工程的仓库（同目录 kicad_pro + kicad_sch + kicad_pcb，附近有 README）：32029 仓库，66793 工程目录
-- [x] 改进事件表（523908 条：PR 33844，commit 490064，全部带文件明细与按后缀计数）
+- [x] 改进事件表（381008 条：PR 33844，commit 347164，commit 须改了该目录的 KiCad 文件，全部带文件明细与按后缀计数）
 - [x] 事件质量过滤（阶段 10，见 `reports/event_quality.md`）
   - [x] 文本：剔除模板、TODO 列表、纯 issue 编号的 PR / commit 正文
   - [x] 规模：KiCad 改动行数与改动文件数上限

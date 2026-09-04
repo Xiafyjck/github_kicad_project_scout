@@ -239,7 +239,9 @@ def analyze_events(store: sqlite3.Connection) -> dict[str, Any]:
                         for r in edb.execute("select repo_id, sha, filename, api_cache_id from commit_files where lower(filename) like '%.kicad_%'")}
         for r in edb.execute("select * from improvement_events"):
             cleaned, todo_ratio, is_template, refs_only = clean_body(f"{r['title'] or ''}\n{r['body'] or ''}" if r["kind"] == "commit" else r["body"])
-            text_ok = len(cleaned) >= MIN_BODY_CHARS and todo_ratio < MAX_TODO_LINE_RATIO and not is_template and not refs_only
+            # Template bodies are not rejected outright: checklist and comment lines are stripped by
+            # clean_body and the remaining text has to clear the length bar like any other body.
+            text_ok = len(cleaned) >= MIN_BODY_CHARS and todo_ratio < MAX_TODO_LINE_RATIO and not refs_only
             files = json.loads(r["kicad_files_json"] or "[]")
             kicad_lines = sum((f.get("additions") or 0) + (f.get("deletions") or 0) for f in files) if r["files_known"] else None
             size_ok = bool(r["files_known"]) and kicad_lines <= MAX_KICAD_LINES and (r["changed_file_count"] or 0) <= MAX_CHANGED_FILES
@@ -353,7 +355,7 @@ def funnel(rows: list[dict[str, Any]], kind: str) -> list[tuple[str, int, int]]:
         ("落在合格工程目录内", lambda r: r["in_qualified"]),
         ("PR 已合并（commit 一律通过）", lambda r: r["kind"] == "commit" or r["merged"]),
         ("改动了 .kicad_pcb", lambda r: r["pcb_changed"]),
-        (f"文本：清洗后正文 >= {MIN_BODY_CHARS} 字，非模板 / TODO / 纯引用", lambda r: r["text_ok"]),
+        (f"文本：删模板行后正文 >= {MIN_BODY_CHARS} 字，非 TODO / 纯引用", lambda r: r["text_ok"]),
         (f"规模：KiCad 改动行 <= {MAX_KICAD_LINES}，改动文件 <= {MAX_CHANGED_FILES}", lambda r: r["size_ok"]),
         ("KiCad 文件全为 modified（无 added / renamed / removed）", lambda r: r["modified_only"]),
         ("patch 文本可用", lambda r: r["patch_available"]),
@@ -377,7 +379,7 @@ def write_report(rows: list[dict[str, Any]], models: dict[str, Any], store: sqli
     add("## 过滤规则\n")
     add("| 过滤 | 规则 |\n|---|---|")
     add("| 范围 | 事件落在合格工程目录内；PR 事件必须已合并；至少改动一个 `.kicad_pcb` |")
-    add(f"| 文本 | 标题 + 正文去掉 checklist、HTML 注释、引用、签名后 >= {MIN_BODY_CHARS} 字；不是 PR 模板（checklist 标记）；TODO 行 < {int(MAX_TODO_LINE_RATIO*100)}%；不是纯 issue 编号 / URL |")
+    add(f"| 文本 | 标题 + 正文去掉 checklist、HTML 注释、引用、签名后 >= {MIN_BODY_CHARS} 字（PR 模板行删掉后按剩余文字计）；TODO 行 < {int(MAX_TODO_LINE_RATIO*100)}%；不是纯 issue 编号 / URL |")
     add(f"| 规模 | 事件内 KiCad 文件的增删行合计 <= {MAX_KICAD_LINES}；改动文件总数 <= {MAX_CHANGED_FILES} |")
     add("| 只改已有文件 | 每个 KiCad 文件状态都是 `modified`，保证前后状态一一对应 |")
     add(f"| 语义 | 从 patch 文本看，行首 token 不属于存盘 churn（`uuid`、`tstamp`、`version`、`generator` 等）的改动行 >= {MIN_SEMANTIC_LINES}；这是网表比较的代理，完整比较需要整个文件 |")
@@ -410,7 +412,7 @@ def write_report(rows: list[dict[str, Any]], models: dict[str, Any], store: sqli
     add("文本不合格的细分：\n")
     add("| 细分 | PR 事件 | commit 事件 |\n|---|---|---|")
     for label, pred in (("清洗后正文短于阈值", lambda r: r["body_clean_chars"] < MIN_BODY_CHARS),
-                        ("PR 模板", lambda r: r["is_template"]),
+                        ("带 PR 模板且删模板行后仍太短", lambda r: r["is_template"] and r["body_clean_chars"] < MIN_BODY_CHARS),
                         ("TODO 为主", lambda r: r["todo_line_ratio"] >= MAX_TODO_LINE_RATIO),
                         ("只有 issue 编号 / URL", lambda r: r["is_refs_only"])):
         add(f"| {label} | {sum(1 for r in eligible if r['kind']=='pull_request' and pred(r))} | {sum(1 for r in eligible if r['kind']=='commit' and pred(r))} |")

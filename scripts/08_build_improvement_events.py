@@ -25,7 +25,7 @@ ISSUE_REF_RE = re.compile(r"(?<![\w/])#(\d+)\b")
 CLOSING_REF_RE = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)\b", re.IGNORECASE)
 EVENT_RULE = {
     "pull_request": "PR whose changed files include a .kicad_pcb/.kicad_sch/.kicad_pro file; one event per (PR, project dir); before = base sha, after = merge commit sha when GitHub reports one, else head sha",
-    "commit": "commit listed by commits?path=<qualified project dir>; before = first parent, after = the commit; changed files from stage 09 when fetched (files_known = 1), else unknown (0)",
+    "commit": "commit listed by commits?path=<qualified project dir> that changed at least one KiCad file in that dir (stage 09 files); before = first parent, after = the commit; commits without stage 09 files keep an event with files_known = 0",
     "project_dir": "deepest qualified project dir containing the file (in_qualified_project = 1), else the file's own directory (0)",
     "linked_issues": "#N references in title/body that resolve to a non-PR issue of the same repo; closing keywords tracked separately",
 }
@@ -413,6 +413,12 @@ def build_repo(
                 parent = c["parents"][0] if c["parents"] else None
                 files_known = int(sha in file_count_by_commit)
                 changed = [f for f in kicad_by_commit.get(sha, []) if subject == "" or f["path"].startswith(subject + "/")]
+                # Same rule as PR events: a commit is an event only if it changed a KiCad file in this dir.
+                # The directory listing also returns commits that touched README, gerbers, firmware; those
+                # are kept in commits / commit_touches but produce no event. Commits whose files stage 09
+                # has not fetched yet keep an event with files_known = 0.
+                if files_known and not changed:
+                    continue
                 out["events"].append(
                     (
                         repo_id, repo["repo_full_name"], subject, 1, "commit", None, sha,

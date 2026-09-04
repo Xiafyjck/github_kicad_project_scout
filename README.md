@@ -39,7 +39,7 @@ Downloads the stages listed in the `STAGES` constant, verifies sha256, and unpac
 5. **Release tables** `05_release_github_trees.py`. Exports `repos.csv`, `trees.jsonl`, `qualified_repos.csv`, `manifest.json` to `data/releases/<date>/` and zips them. Kept for the GitHub Release A artifacts; the ModelScope dataset supersedes it.
 6. **Repo activity stats** `06_github_fetch_repo_stats.py`. GitHub GraphQL, 25 repos per query: default-branch commit count, PR count total and merged, issue count, fork / archived / disabled flags, parent, pushedAt, stars. Raw responses cached by query + variables, one `repo_stats` row per repo.
 7. **Repo history** `07_github_fetch_repo_history.py`. For every candidate repo, four REST listings with all pages: `commits?path=<project_dir>` per qualified project dir (whole-repo history when the repo has none), every PR, the changed files of every PR (with patch), every issue. Raw pages cached by URL + params; `listing_pages` indexes them by repo, kind, subject, page.
-8. **Improvement events** `08_build_improvement_events.py`. Local post-processing over stages 07 and 09: `commits`, `commit_touches`, `pull_requests`, `pull_request_files`, `commit_files`, `issues`, and `improvement_events`. An event is one PCB change with its explanation: a PR whose changed files include `.kicad_pcb` / `.kicad_sch` / `.kicad_pro` (one event per PR and project dir, before = base sha, after = merge or head sha), or a commit listed under a qualified project dir (before = first parent, after = the commit). Per-suffix file counts, changed-file lists, and `#N` issue references are attached.
+8. **Improvement events** `08_build_improvement_events.py`. Local post-processing over stages 07 and 09: `commits`, `commit_touches`, `pull_requests`, `pull_request_files`, `commit_files`, `issues`, and `improvement_events`. An event is one PCB change with its explanation: a PR whose changed files include `.kicad_pcb` / `.kicad_sch` / `.kicad_pro` (one event per PR and project dir, before = base sha, after = merge or head sha), or a commit listed under a qualified project dir that changed a KiCad file there (before = first parent, after = the commit). Per-suffix file counts, changed-file lists, and `#N` issue references are attached.
 9. **Commit files** `09_github_fetch_commit_files.py`. For every commit stage 07 listed under a qualified project dir, fetches `commits/{sha}` with all file pages so commit events carry the same file detail as PR events. Rerun stage 08 afterwards.
 10. **Event quality** `10_analyze_event_quality.py`. Local. Scores every event for benchmark use: text quality (templates, TODO lists, bare issue numbers dropped), change size caps, modified-only KiCad files, save-only churn detected from the patch text (uuid / tstamp / version lines vs real changes), per-repo quota, plus a 3D-model census of qualified repos. Writes `data/cache/event_quality/state.sqlite` and the report `reports/event_quality.md` with a seed CSV of issue-driven events.
 
@@ -68,6 +68,23 @@ Every script resumes from its own SQLite cache. Rerunning the whole chain agains
 - **Activity.** Median repo: 16 commits, 0 PRs, 0 issues, 0 stars. 80% never received a PR, 84% never had an issue; 6897 repos (17%) have a merged PR. 91% were created after 2022; 67% were pushed within the last year.
 - **History.** 140678 PRs, 18348 of them (13%) touch KiCad files, from 4418 repos and 5453 authors; 15483 merged. KiCad PRs double every year (2022: 1287, 2024: 3016, 2025: 4031, 2026 to date: 3871). 423293 commits touch a complete project directory; 97849 issues.
 - **Benchmark material.** Merged PRs inside a complete project that change a `.kicad_pcb`: 8719 PRs from 3022 repos, 3292 with a description over 100 characters, 801 linked to an issue. Commit events with a `.kicad_pcb` change: 275885, of which 34535 have a multi-line message and 15864 a body over 100 characters. Each event carries before / after sha, the changed KiCad files with status and line counts, and the patch text in the cache.
+
+## Ten example events
+
+Picked from the final pool (tiers A / B): one documented change each, schematic and layout both touched, before and after states pair up.
+
+| repo | change | what changed |
+|---|---|---|
+| Tinkerbug-Robotics/TinkerRocket | [commit edef97e7](https://github.com/Tinkerbug-Robotics/TinkerRocket/commit/edef97e7cfe0f62e66d90c6e89ba15fb602df408) | eFuse current-limit resistor 100R to 127R for the JST VH battery input, sized per datasheet; linked issue #658 |
+| greatscottgadgets/cynthion-hardware | [commit 9f84e603](https://github.com/greatscottgadgets/cynthion-hardware/commit/9f84e60331b9a53fa23bea8aa7e268448d4a9bc2) | ULPI series resistors replaced with 0 ohm after emissions tests showed no benefit |
+| v3l0c1r4pt0r/ucm4 | [commit 77b04758](https://github.com/v3l0c1r4pt0r/ucm4/commit/77b04758c1153bfeca18e843d32b71fc71f97494) | TVS diode switched to a TI part in USON-10, footprint replaced |
+| worlickwerx/pi-cluster-two | [commit b4cad36b](https://github.com/worlickwerx/pi-cluster-two/commit/b4cad36b61249c70ef9f3a4511c5a185b0e4123f) | test-point reference designators made to plot on silkscreen after they went missing on v3.1 |
+| DashiellRussell/18650-cell-carriers | [commit 32ce50d9](https://github.com/DashiellRussell/18650-cell-carriers/commit/32ce50d989bf1e01b6f9e1e0f4eb47fda2270419) | board shortened to 117.4 mm, corners rounded, wire-pad and solder-bridge columns merged into one footprint |
+| jalopezg-git/libledmtx | [PR #13](https://github.com/jalopezg-git/libledmtx/pull/13) | review fixes on a 32x8 LED matrix driver board, including a better-rated shift register |
+| MatthiasElectronic/AWG_DHO8-900 | [PR #2](https://github.com/MatthiasElectronic/AWG_DHO8-900/pull/2) | footprint rotation fields added so JLCPCB assembly orients parts correctly |
+| flohoff/vbus-adapter | [commit 2f14aad9](https://github.com/flohoff/vbus-adapter/commit/2f14aad9af962806a60f4045787c935b95a1f3d8) | isolator changed to a default-low part so the bus is not pulled low on power loss, pull-down added |
+| eaguirre12/CUNY-Js5 | [commit e48cdeb3](https://github.com/eaguirre12/CUNY-Js5/commit/e48cdeb3b19f2a4b7889bdd19c922902555c40da) | unused connector removed, USB connector replaced by a note, heater resistor excluded from BOM |
+| cajunpanda/gameboy-hifi-audio | [commit b201af75](https://github.com/cajunpanda/gameboy-hifi-audio/commit/b201af75e8ed27f324039df629b385db4026f844) | rev B: ESP32 module with built-in antenna, AC-coupled amplifier input, two resistors dropped |
 
 ## Layout
 
@@ -118,7 +135,7 @@ The script that packs and uploads the caches is not part of this repo.
 ### Post-processing
 
 - [x] First pass: repos with a complete project (kicad_pro + kicad_sch + kicad_pcb in one dir, README nearby): 32029 repos, 66793 project dirs
-- [x] Improvement events table (523908 events: 33844 from PRs, 490064 from commits, all with changed-file detail and per-suffix counts)
+- [x] Improvement events table (381008 events: 33844 from PRs, 347164 from commits that changed a KiCad file in the dir, all with changed-file detail and per-suffix counts)
 - [x] Event quality filters (stage 10, see `reports/event_quality.md`)
   - [x] Text: drop PR / commit bodies that are templates, TODO lists, or bare issue numbers
   - [x] Size: cap KiCad line changes and changed-file count

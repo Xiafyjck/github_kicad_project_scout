@@ -1,13 +1,13 @@
 # 改进事件质量报告
 
-生成时间 2026-09-04T02:01:40.587888+00:00，由 `scripts/10_analyze_event_quality.py` 对阶段 08 的 523908 个事件计算，覆盖 `.kicad_pro` 搜到的 39902 个仓库。每个事件的标志在 `data/cache/event_quality/state.sqlite` 的 `event_quality` 表。
+生成时间 2026-09-04T03:36:58.249709+00:00，由 `scripts/10_analyze_event_quality.py` 对阶段 08 的 381008 个事件计算，覆盖 `.kicad_pro` 搜到的 39902 个仓库。每个事件的标志在 `data/cache/event_quality/state.sqlite` 的 `event_quality` 表。
 
 ## 过滤规则
 
 | 过滤 | 规则 |
 |---|---|
 | 范围 | 事件落在合格工程目录内；PR 事件必须已合并；至少改动一个 `.kicad_pcb` |
-| 文本 | 标题 + 正文去掉 checklist、HTML 注释、引用、签名后 >= 100 字；不是 PR 模板（checklist 标记）；TODO 行 < 50%；不是纯 issue 编号 / URL |
+| 文本 | 标题 + 正文去掉 checklist、HTML 注释、引用、签名后 >= 100 字（PR 模板行删掉后按剩余文字计）；TODO 行 < 50%；不是纯 issue 编号 / URL |
 | 规模 | 事件内 KiCad 文件的增删行合计 <= 8000；改动文件总数 <= 40 |
 | 只改已有文件 | 每个 KiCad 文件状态都是 `modified`，保证前后状态一一对应 |
 | 语义 | 从 patch 文本看，行首 token 不属于存盘 churn（`uuid`、`tstamp`、`version`、`generator` 等）的改动行 >= 5；这是网表比较的代理，完整比较需要整个文件 |
@@ -23,38 +23,38 @@
 | 落在合格工程目录内 | 16372 | 3520 |
 | PR 已合并（commit 一律通过） | 14200 | 3197 |
 | 改动了 .kicad_pcb | 12152 | 3022 |
-| 文本：清洗后正文 >= 100 字，非模板 / TODO / 纯引用 | 3534 | 1125 |
-| 规模：KiCad 改动行 <= 8000，改动文件 <= 40 | 1066 | 435 |
-| KiCad 文件全为 modified（无 added / renamed / removed） | 855 | 325 |
-| patch 文本可用 | 511 | 190 |
-| 语义改动行 >= 5（非只存盘 churn） | 328 | 169 |
-| 仓库限额 20 以内 | 283 | 168 |
+| 文本：删模板行后正文 >= 100 字，非 TODO / 纯引用 | 4119 | 1191 |
+| 规模：KiCad 改动行 <= 8000，改动文件 <= 40 | 1257 | 466 |
+| KiCad 文件全为 modified（无 added / renamed / removed） | 1005 | 352 |
+| patch 文本可用 | 581 | 205 |
+| 语义改动行 >= 5（非只存盘 churn） | 394 | 185 |
+| 仓库限额 20 以内 | 336 | 184 |
 
 ## 漏斗：commit 事件
 
 | 步骤 | 事件 | 仓库 |
 |---|---|---|
-| 全部事件 | 490064 | 32026 |
-| 落在合格工程目录内 | 490064 | 32026 |
-| PR 已合并（commit 一律通过） | 490064 | 32026 |
+| 全部事件 | 347164 | 31977 |
+| 落在合格工程目录内 | 347164 | 31977 |
+| PR 已合并（commit 一律通过） | 347164 | 31977 |
 | 改动了 .kicad_pcb | 275885 | 31972 |
-| 文本：清洗后正文 >= 100 字，非模板 / TODO / 纯引用 | 23086 | 5138 |
-| 规模：KiCad 改动行 <= 8000，改动文件 <= 40 | 10456 | 2899 |
-| KiCad 文件全为 modified（无 added / renamed / removed） | 8444 | 2359 |
-| patch 文本可用 | 4398 | 1429 |
-| 语义改动行 >= 5（非只存盘 churn） | 3957 | 1372 |
-| 仓库限额 20 以内 | 3416 | 1372 |
+| 文本：删模板行后正文 >= 100 字，非 TODO / 纯引用 | 23100 | 5138 |
+| 规模：KiCad 改动行 <= 8000，改动文件 <= 40 | 10459 | 2899 |
+| KiCad 文件全为 modified（无 added / renamed / removed） | 8447 | 2359 |
+| patch 文本可用 | 4399 | 1429 |
+| 语义改动行 >= 5（非只存盘 churn） | 3958 | 1372 |
+| 仓库限额 20 以内 | 3403 | 1372 |
 
 ## 分层
 
 | 等级 | PR 事件 | commit 事件 | 仓库 |
 |---|---|---|---|
-| A | 70 | 130 | 57 |
-| B | 258 | 3827 | 1411 |
-| C | 344 | 4046 | 1722 |
-| X | 33172 | 482061 | 32544 |
+| A | 91 | 131 | 59 |
+| B | 303 | 3827 | 1414 |
+| C | 424 | 4048 | 1726 |
+| X | 33026 | 339158 | 32498 |
 
-最终池（A + B 且在限额内）：**3699** 个事件，来自 **1441** 个仓库（PR 283，commit 3416）；限额去掉 586 个。
+最终池（A + B 且在限额内）：**3739** 个事件，来自 **1445** 个仓库（PR 336，commit 3403）；限额去掉 613 个。
 
 ## 排除原因
 
@@ -62,28 +62,28 @@
 
 | 原因 | PR 事件 | commit 事件 |
 |---|---|---|
-| 文本 | 8618 | 252799 |
+| 文本 | 8033 | 252785 |
 | 规模 | 8653 | 136734 |
 | 含 added / renamed / removed | 6062 | 88818 |
-| 只存盘 churn | 183 | 441 |
+| 只存盘 churn | 187 | 441 |
 
 文本不合格的细分：
 
 | 细分 | PR 事件 | commit 事件 |
 |---|---|---|
 | 清洗后正文短于阈值 | 8016 | 252743 |
-| PR 模板 | 585 | 14 |
+| 带 PR 模板且删模板行后仍太短 | 0 | 0 |
 | TODO 为主 | 2 | 80 |
 | 只有 issue 编号 / URL | 149 | 2417 |
 
 ## 只存盘 churn
 
-4909 个事件的每个 KiCad 文件都有 patch 文本。语义行与 churn 行：
+4980 个事件的每个 KiCad 文件都有 patch 文本。语义行与 churn 行：
 
 | | 事件 | 语义行中位数 | churn 行中位数 | 只有 churn 的事件 |
 |---|---|---|---|---|
-| pull_request | 511 | 24 | 3 | 183 |
-| commit | 4398 | 165 | 4 | 441 |
+| pull_request | 581 | 34 | 4 | 187 |
+| commit | 4399 | 165 | 4 | 441 |
 
 ## 仓库集中度
 
@@ -92,8 +92,8 @@
 | 仓库 | A + B 事件 | 限额后保留 |
 |---|---|---|
 | sabas0ba/kicad_skills | 158 | 20 |
+| rjwalters/kicad-tools | 116 | 20 |
 | LastZactionHero/defcon-silent-disco | 110 | 20 |
-| rjwalters/kicad-tools | 97 | 20 |
 | Tinkerbug-Robotics/TinkerRocket | 67 | 20 |
 | dektronics/printalyzer-timer | 63 | 20 |
 | nielsverhoeven/PoE-FanController | 52 | 20 |
@@ -102,7 +102,7 @@
 | nanographs/Scan-Gen-Glasgow-Testing | 36 | 20 |
 | ideocentric/caryatid | 36 | 20 |
 | EwoudVV/ducktop2 | 34 | 20 |
-| v3l0c1r4pt0r/ucm4 | 30 | 20 |
+| BennetLeff/temper | 33 | 20 |
 
 ## 合格仓库中的 3D 模型
 
@@ -112,17 +112,17 @@
 
 ### A 级
 
-- **spacelab-ufsc/pc104-adapter** commit 72978706ff，目录 `/`，pcb 1 sch 0 pro 0，语义 834 行 churn 4 行，文本 115 字，issue [3]。*bottom-board: layout: Fixing the PC-104 outline (silk screen) and adding a label with the board name* [链接](https://github.com/spacelab-ufsc/pc104-adapter/commit/72978706ff397f3ddf600666e1ed5b88997e9526)
-- **nielsverhoeven/PoE-FanController** commit 92e69c7dab，目录 `hardware/kicad`，pcb 1 sch 1 pro 0，语义 246 行 churn 77 行，文本 2400 字，issue [40]。*hw(pcb): fix DRC violations from ESP32-P4 layout -- J1 footprint + placement (#40)* [链接](https://github.com/nielsverhoeven/PoE-FanController/commit/92e69c7dab3576d3d744fe9c62401113ac47f6da)
-- **nielsverhoeven/PoE-FanController** commit 6f8b905e63，目录 `hardware/kicad`，pcb 1 sch 0 pro 1，语义 895 行 churn 118 行，文本 765 字，issue [75]。*hw(pcb): portrait layout 42x78mm, J8 repositioned per constitution v3.1.0* [链接](https://github.com/nielsverhoeven/PoE-FanController/commit/6f8b905e63a310fa9a67fdc973318f9555ae7e0e)
-- **open-ephys/ephys-test-board** PR #45，目录 `pcb`，pcb 1 sch 1 pro 1，语义 499 行 churn 59 行，文本 112 字，issue [41]。*Add bypass for battery protection circuit* [链接](https://github.com/open-ephys/ephys-test-board/pull/45)
+- **rjwalters/kicad-tools** PR #2954，目录 `boards/03-usb-joystick/output`，pcb 2 sch 0 pro 0，语义 1206 行 churn 565 行，文本 6575 字，issue [2918, 2919, 2943]。*fix(board-03): nudge J2 west 2mm to clear JOY_Y channel (closes #2943)* [链接](https://github.com/rjwalters/kicad-tools/pull/2954)
+- **nielsverhoeven/PoE-FanController** commit b58334002b，目录 `hardware/kicad`，pcb 1 sch 0 pro 0，语义 599 行 churn 95 行，文本 589 字，issue [148, 152]。*hw(pcb): T003 — sync PCB J8 pad nets to corrected assignments* [链接](https://github.com/nielsverhoeven/PoE-FanController/commit/b58334002b1ec606df897aec4962960e85ac7f19)
+- **rjwalters/kicad-tools** commit 82a9525ec6，目录 `boards/00-simple-led/output`，pcb 1 sch 0 pro 0，语义 36 行 churn 2 行，文本 5168 字，issue [3509, 3714]。*feat(pcb): auto-size drawing sheet to board + center (page_fit) (#3715)* [链接](https://github.com/rjwalters/kicad-tools/commit/82a9525ec6d0004ff10d6a30b2d180fec8660301)
+- **andreika-git/hellen-one** commit a5da2e4e43，目录 `kicad/modules/hellen1-wbo`，pcb 1 sch 1 pro 0，语义 79 行 churn 0 行，文本 109 字，issue [281]。*Revert " #281 CANH and CANL aren`t flipped now"* [链接](https://github.com/andreika-git/hellen-one/commit/a5da2e4e434119020e0df7d370dd62611a0455ff)
 
 ### B 级
 
-- **OpenDrone-hw/OpenESC-30x30** commit 63119a4f0f，目录 `hardware`，pcb 1 sch 0 pro 0，语义 688 行 churn 8 行，文本 212 字，issue []。*Rebrand back silkscreen to incutec, 4.7uF bulk caps on board* [链接](https://github.com/OpenDrone-hw/OpenESC-30x30/commit/63119a4f0f041316157fbf0d3bf13e6b7f86bf2d)
-- **tnl3pdx/SleepBud** commit a5678791ff，目录 `KiCad Schematics/SleepBud`，pcb 1 sch 1 pro 0，语义 42 行 churn 52 行，文本 131 字，issue []。*PCB Done Needs Checking Over* [链接](https://github.com/tnl3pdx/SleepBud/commit/a5678791ff23c33bdb8be031b1187fe799e45b99)
-- **10-X-eng/KiChad** commit c62b9aad23，目录 `qa/data/pcbnew`，pcb 1 sch 0 pro 0，语义 55 行 churn 11 行，文本 181 字，issue []。*API: Avoid redundant serialization of polyline arcs* [链接](https://github.com/10-X-eng/KiChad/commit/c62b9aad23f88a5beb2a5f50a8b3a862e2f2b1b3)
-- **portlandrobotics/common_platform** PR #14，目录 `hardware/romi_board`，pcb 1 sch 0 pro 0，语义 577 行 churn 10 行，文本 102 字，issue []。*Fix power/ground terminal swap* [链接](https://github.com/portlandrobotics/common_platform/pull/14)
+- **mayashapiro19/table-zamboni** commit 964547fdc9，目录 `ToF_PCB`，pcb 1 sch 0 pro 0，语义 454 行 churn 175 行，文本 113 字，issue []。*Added layers and fixed layout + shape of pcb. Going to add esd protection now so pushing changes bef* [链接](https://github.com/mayashapiro19/table-zamboni/commit/964547fdc953fadebc64ebc95b675016558caaaa)
+- **PubInv/general-purpose-alarm-device** commit aaae4f9fef，目录 `Hardware/GeneralPurposeAlarmDevicePCB`，pcb 1 sch 1 pro 1，语义 1537 行 churn 12 行，文本 145 字，issue []。*Make JST footprint for J105 in porject library. Change schematic for JST footprint. Import to PCB. P* [链接](https://github.com/PubInv/general-purpose-alarm-device/commit/aaae4f9fefec6c89240c208de056af3d295ea779)
+- **DeMarco/DMH-VCO-40106** commit 320838d409，目录 `DMH_VCO_40106_PANEL`，pcb 1 sch 0 pro 0，语义 30 行 churn 0 行，文本 164 字，issue []。*Fixed resistor values and regenerated gerbers* [链接](https://github.com/DeMarco/DMH-VCO-40106/commit/320838d409babeaa6bfa71672ae396be86eb6533)
+- **CactusRockets/Weiss_Placas** commit e3014e1841，目录 `Placa de processamento`，pcb 1 sch 1 pro 1，语义 849 行 churn 6 行，文本 242 字，issue []。*Placa de processamento: Aterrando o pino SDO do BMP388 para escolher o endereço do sensor. Com o BMP* [链接](https://github.com/CactusRockets/Weiss_Placas/commit/e3014e1841003d8d661f6f3ac7b91237aacbd3ca)
 
 ## 下一步
 
