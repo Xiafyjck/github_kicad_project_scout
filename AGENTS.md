@@ -16,7 +16,7 @@ Rules for anyone, human or coding agent, who changes this repo. Read [README.md]
 - **No CLI.** No argparse, no `sys.argv`, no subcommands. Every run parameter (suffixes, intervals, paths) is a constant at the top of the script. Changing a parameter means editing code.
 - **No speculative error handling.** Handle only failures actually observed (for example non-JSON API bodies). Do not pre-catch scenarios that have not happened; let unknown problems surface early and loudly.
 - **Small, self-contained scripts.** One script per stage, no shared package yet. Reuse helper functions by copying while the script count is small; extract a common module only once the GitHub scripts have accumulated. Prefer incremental commits over large rewrites.
-- **English only in code.** Comments, docstrings, log lines, and error messages are English. Chinese lives only in README.zh-CN.md.
+- **English only in code.** Comments, docstrings, log lines, and error messages are English. Generated reports under `reports/` are written in Chinese; README.zh-CN.md is the Chinese README.
 - **Keep the README TODO list current.** Tick items when done, add new ones in both README files.
 - **Run with uv.** `uv run scripts/<nn>_<name>.py` from the repo root. Python 3.11+, deps are httpx, python-dotenv, modelscope, zstandard.
 - **Tokens come from `.env`.** `GITHUB_TOKEN_1..N` for fetching, `MODELSCOPE_TOKEN` for publishing. Never print, log, or commit them.

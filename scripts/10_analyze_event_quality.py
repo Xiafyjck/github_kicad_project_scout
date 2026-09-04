@@ -349,16 +349,16 @@ def analyze_events(store: sqlite3.Connection) -> dict[str, Any]:
 
 def funnel(rows: list[dict[str, Any]], kind: str) -> list[tuple[str, int, int]]:
     steps = [
-        ("all events", lambda r: True),
-        ("inside a qualified project dir", lambda r: r["in_qualified"]),
-        ("PR merged (commits always pass)", lambda r: r["kind"] == "commit" or r["merged"]),
-        (".kicad_pcb changed", lambda r: r["pcb_changed"]),
-        ("text: cleaned body >= 100 chars, no template / TODO / refs-only", lambda r: r["text_ok"]),
-        (f"size: KiCad lines <= {MAX_KICAD_LINES} and changed files <= {MAX_CHANGED_FILES}", lambda r: r["size_ok"]),
-        ("all KiCad files modified (no add / rename / remove)", lambda r: r["modified_only"]),
-        ("patch text available", lambda r: r["patch_available"]),
-        ("semantic changed lines >= 5 (not save-only churn)", lambda r: r["semantic_ok"]),
-        (f"within per-repo quota of {REPO_QUOTA}", lambda r: r.get("in_quota") and r["tier"] in ("A", "B")),
+        ("全部事件", lambda r: True),
+        ("落在合格工程目录内", lambda r: r["in_qualified"]),
+        ("PR 已合并（commit 一律通过）", lambda r: r["kind"] == "commit" or r["merged"]),
+        ("改动了 .kicad_pcb", lambda r: r["pcb_changed"]),
+        (f"文本：清洗后正文 >= {MIN_BODY_CHARS} 字，非模板 / TODO / 纯引用", lambda r: r["text_ok"]),
+        (f"规模：KiCad 改动行 <= {MAX_KICAD_LINES}，改动文件 <= {MAX_CHANGED_FILES}", lambda r: r["size_ok"]),
+        ("KiCad 文件全为 modified（无 added / renamed / removed）", lambda r: r["modified_only"]),
+        ("patch 文本可用", lambda r: r["patch_available"]),
+        (f"语义改动行 >= {MIN_SEMANTIC_LINES}（非只存盘 churn）", lambda r: r["semantic_ok"]),
+        (f"仓库限额 {REPO_QUOTA} 以内", lambda r: r.get("in_quota") and r["tier"] in ("A", "B")),
     ]
     out = []
     current = [r for r in rows if r["kind"] == kind]
@@ -372,55 +372,54 @@ def write_report(rows: list[dict[str, Any]], models: dict[str, Any], store: sqli
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
     add = lines.append
-    add(f"# Improvement event quality report\n\nGenerated {now_utc()} by `scripts/10_analyze_event_quality.py` over {len(rows)} events "
-        f"(stage 08) for the 39902 repos found by `.kicad_pro`. Flags per event are in `data/cache/event_quality/state.sqlite`, table `event_quality`.\n")
-    add("## Filters\n")
-    add("| filter | rule |\n|---|---|")
-    add("| scope | event inside a qualified project dir; PR events must be merged; at least one `.kicad_pcb` changed |")
-    add(f"| text | title + body with checklists, HTML comments, quotes, sign-offs removed is >= {MIN_BODY_CHARS} chars; not a PR template (checklist markers); < {int(MAX_TODO_LINE_RATIO*100)}% TODO lines; not just issue numbers / URLs |")
-    add(f"| size | added + deleted lines over the event's KiCad files <= {MAX_KICAD_LINES}; total changed files <= {MAX_CHANGED_FILES} |")
-    add("| modified only | every KiCad file has status `modified`, so before and after states pair up |")
-    add(f"| semantics | from the patch text, changed lines whose leading token is not save-time churn (`uuid`, `tstamp`, `version`, `generator`, ...) >= {MIN_SEMANTIC_LINES}; this is a proxy for a netlist comparison, which needs the full files |")
-    add(f"| quota | at most {REPO_QUOTA} events per repo, best tier then longest text first |")
-    add("\nTiers: **A** all filters pass and an issue is linked; **B** all filters pass; **C** text / size / modified pass but GitHub omitted the patch (large file), semantics unknown; **X** excluded.\n")
+    add(f"# 改进事件质量报告\n\n生成时间 {now_utc()}，由 `scripts/10_analyze_event_quality.py` 对阶段 08 的 {len(rows)} 个事件计算，"
+        f"覆盖 `.kicad_pro` 搜到的 39902 个仓库。每个事件的标志在 `data/cache/event_quality/state.sqlite` 的 `event_quality` 表。\n")
+    add("## 过滤规则\n")
+    add("| 过滤 | 规则 |\n|---|---|")
+    add("| 范围 | 事件落在合格工程目录内；PR 事件必须已合并；至少改动一个 `.kicad_pcb` |")
+    add(f"| 文本 | 标题 + 正文去掉 checklist、HTML 注释、引用、签名后 >= {MIN_BODY_CHARS} 字；不是 PR 模板（checklist 标记）；TODO 行 < {int(MAX_TODO_LINE_RATIO*100)}%；不是纯 issue 编号 / URL |")
+    add(f"| 规模 | 事件内 KiCad 文件的增删行合计 <= {MAX_KICAD_LINES}；改动文件总数 <= {MAX_CHANGED_FILES} |")
+    add("| 只改已有文件 | 每个 KiCad 文件状态都是 `modified`，保证前后状态一一对应 |")
+    add(f"| 语义 | 从 patch 文本看，行首 token 不属于存盘 churn（`uuid`、`tstamp`、`version`、`generator` 等）的改动行 >= {MIN_SEMANTIC_LINES}；这是网表比较的代理，完整比较需要整个文件 |")
+    add(f"| 限额 | 每个仓库最多 {REPO_QUOTA} 个事件，先按等级再按文本长度 |")
+    add("\n等级：**A** 全部通过且关联 issue；**B** 全部通过；**C** 文本 / 规模 / modified 通过但 GitHub 省略了 patch（文件过大），语义未知；**X** 排除。\n")
 
-    for kind, label in (("pull_request", "PR events"), ("commit", "commit events")):
-        add(f"## Funnel: {label}\n")
-        add("| step | events | repos |\n|---|---|---|")
+    for kind, label in (("pull_request", "PR 事件"), ("commit", "commit 事件")):
+        add(f"## 漏斗：{label}\n")
+        add("| 步骤 | 事件 | 仓库 |\n|---|---|---|")
         for step, n, repos in funnel(rows, kind):
             add(f"| {step} | {n} | {repos} |")
         add("")
 
-    add("## Tiers\n")
-    add("| tier | PR events | commit events | repos |\n|---|---|---|---|")
+    add("## 分层\n")
+    add("| 等级 | PR 事件 | commit 事件 | 仓库 |\n|---|---|---|---|")
     for tier in ("A", "B", "C", "X"):
         sub = [r for r in rows if r["tier"] == tier]
         add(f"| {tier} | {sum(1 for r in sub if r['kind']=='pull_request')} | {sum(1 for r in sub if r['kind']=='commit')} | {len({r['repo_id'] for r in sub})} |")
     pool = [r for r in rows if r["tier"] in ("A", "B") and r.get("in_quota")]
-    add(f"\nFinal pool (tiers A + B within quota): **{len(pool)}** events from **{len({r['repo_id'] for r in pool})}** repos "
-        f"({sum(1 for r in pool if r['kind']=='pull_request')} PR, {sum(1 for r in pool if r['kind']=='commit')} commit); "
-        f"quota removed {sum(1 for r in rows if r['tier'] in ('A','B') and not r.get('in_quota'))} events.\n")
+    add(f"\n最终池（A + B 且在限额内）：**{len(pool)}** 个事件，来自 **{len({r['repo_id'] for r in pool})}** 个仓库"
+        f"（PR {sum(1 for r in pool if r['kind']=='pull_request')}，commit {sum(1 for r in pool if r['kind']=='commit')}）；限额去掉 {sum(1 for r in rows if r['tier'] in ('A','B') and not r.get('in_quota'))} 个。\n")
 
-    add("## Why events are excluded\n")
-    add("Counted over eligible events (qualified dir, merged or commit, pcb changed); an event can fail several filters.\n")
-    add("| reason | PR events | commit events |\n|---|---|---|")
+    add("## 排除原因\n")
+    add("在范围内事件（合格目录、已合并或 commit、改了 pcb）上统计；一个事件可能同时不过多个过滤。\n")
+    add("| 原因 | PR 事件 | commit 事件 |\n|---|---|---|")
     eligible = [r for r in rows if r["in_qualified"] and r["pcb_changed"] and (r["kind"] == "commit" or r["merged"])]
-    for reason in ("text", "size", "not_modified_only", "save_only_churn"):
-        add(f"| {reason} | {sum(1 for r in eligible if r['kind']=='pull_request' and reason in r['reasons'])} | {sum(1 for r in eligible if r['kind']=='commit' and reason in r['reasons'])} |")
+    for reason, label in (("text", "文本"), ("size", "规模"), ("not_modified_only", "含 added / renamed / removed"), ("save_only_churn", "只存盘 churn")):
+        add(f"| {label} | {sum(1 for r in eligible if r['kind']=='pull_request' and reason in r['reasons'])} | {sum(1 for r in eligible if r['kind']=='commit' and reason in r['reasons'])} |")
     add("")
-    add("Text failures broken down:\n")
-    add("| sub-reason | PR events | commit events |\n|---|---|---|")
-    for label, pred in (("cleaned body shorter than threshold", lambda r: r["body_clean_chars"] < MIN_BODY_CHARS),
-                        ("PR template", lambda r: r["is_template"]),
-                        ("TODO-dominated", lambda r: r["todo_line_ratio"] >= MAX_TODO_LINE_RATIO),
-                        ("issue numbers / URLs only", lambda r: r["is_refs_only"])):
+    add("文本不合格的细分：\n")
+    add("| 细分 | PR 事件 | commit 事件 |\n|---|---|---|")
+    for label, pred in (("清洗后正文短于阈值", lambda r: r["body_clean_chars"] < MIN_BODY_CHARS),
+                        ("PR 模板", lambda r: r["is_template"]),
+                        ("TODO 为主", lambda r: r["todo_line_ratio"] >= MAX_TODO_LINE_RATIO),
+                        ("只有 issue 编号 / URL", lambda r: r["is_refs_only"])):
         add(f"| {label} | {sum(1 for r in eligible if r['kind']=='pull_request' and pred(r))} | {sum(1 for r in eligible if r['kind']=='commit' and pred(r))} |")
     add("")
 
-    add("## Save-only churn\n")
+    add("## 只存盘 churn\n")
     with_patch = [r for r in rows if r["patch_available"]]
-    add(f"{len(with_patch)} events had patch text for every KiCad file. Semantic vs churn changed lines:\n")
-    add("| | events | median semantic lines | median churn lines | churn-only events |\n|---|---|---|---|---|")
+    add(f"{len(with_patch)} 个事件的每个 KiCad 文件都有 patch 文本。语义行与 churn 行：\n")
+    add("| | 事件 | 语义行中位数 | churn 行中位数 | 只有 churn 的事件 |\n|---|---|---|---|---|")
     for kind in ("pull_request", "commit"):
         sub = [r for r in with_patch if r["kind"] == kind]
         if not sub:
@@ -429,35 +428,35 @@ def write_report(rows: list[dict[str, Any]], models: dict[str, Any], store: sqli
         add(f"| {kind} | {len(sub)} | {sem[len(sem)//2]} | {ch[len(ch)//2]} | {sum(1 for r in sub if not r['semantic_ok'])} |")
     add("")
 
-    add("## Repo concentration\n")
-    add("Top repos by tier A + B events before the quota:\n")
-    add("| repo | A + B events | kept by quota |\n|---|---|---|")
+    add("## 仓库集中度\n")
+    add("限额前 A + B 事件最多的仓库：\n")
+    add("| 仓库 | A + B 事件 | 限额后保留 |\n|---|---|---|")
     counts = Counter(r["repo_full_name"] for r in rows if r["tier"] in ("A", "B"))
     kept = Counter(r["repo_full_name"] for r in pool)
     for name, n in counts.most_common(12):
         add(f"| {name} | {n} | {kept[name]} |")
     add("")
 
-    add("## 3D models in qualified repos\n")
-    add(f"Of {models['qualified_repos']} qualified repos, {models['repos_with_3d_models']} ship at least one 3D model file "
-        f"({', '.join(MODEL_3D_SUFFIXES)}); {models['repos_with_3d_models_in_project_dir']} have one inside a project dir. Files by suffix: "
-        + ", ".join(f"{k} {v}" for k, v in models["suffix_totals"].items()) + ". Table `repo_3d_models`.\n")
+    add("## 合格仓库中的 3D 模型\n")
+    add(f"{models['qualified_repos']} 个合格仓库中，{models['repos_with_3d_models']} 个至少带一个 3D 模型文件"
+        f"（{', '.join(MODEL_3D_SUFFIXES)}）；{models['repos_with_3d_models_in_project_dir']} 个在工程目录内。按后缀的文件数："
+        + "，".join(f"{k} {v}" for k, v in models["suffix_totals"].items()) + "。见表 `repo_3d_models`。\n")
 
-    add("## Samples\n")
+    add("## 样本\n")
     for tier in ("A", "B"):
-        add(f"### Tier {tier}\n")
+        add(f"### {tier} 级\n")
         for r in store.execute("select e.*, q.semantic_lines, q.churn_lines, q.body_clean_chars from event_quality q join events.improvement_events e on e.id = q.event_id where q.tier = ? and q.in_quota = 1 order by random() limit 4", (tier,)):
             ref = f"PR #{r['number']}" if r["kind"] == "pull_request" else f"commit {r['sha'][:10]}"
-            add(f"- **{r['repo_full_name']}** {ref}, dir `{r['project_dir'] or '/'}`, pcb {r['kicad_pcb_count']} sch {r['kicad_sch_count']} pro {r['kicad_pro_count']}, "
-                f"semantic {r['semantic_lines']} churn {r['churn_lines']} lines, text {r['body_clean_chars']} chars, issues {r['linked_issues_json']}. "
-                f"*{(r['title'] or '').strip()[:100]}* [link]({r['html_url']})")
+            add(f"- **{r['repo_full_name']}** {ref}，目录 `{r['project_dir'] or '/'}`，pcb {r['kicad_pcb_count']} sch {r['kicad_sch_count']} pro {r['kicad_pro_count']}，"
+                f"语义 {r['semantic_lines']} 行 churn {r['churn_lines']} 行，文本 {r['body_clean_chars']} 字，issue {r['linked_issues_json']}。"
+                f"*{(r['title'] or '').strip()[:100]}* [链接]({r['html_url']})")
         add("")
 
-    add("## Next steps\n")
-    add("- Netlist comparison: parse `.kicad_sch` / `.kicad_pcb` S-expressions at before and after sha (needs the full files, i.e. a checkout) and compare nets, components, footprints; the churn heuristic above only reads patches.")
-    add("- DRC / ERC with `kicad-cli` (found at /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli) on both states; keep events whose error counts do not grow.")
-    add(f"- Manual review of the tier A seed set: `{SEED_CSV_PATH}`.")
-    add("- Rerun after the 29279 added repos are fetched (Release C).")
+    add("## 下一步\n")
+    add("- 网表比较：在改动前后 sha 上解析 `.kicad_sch` / `.kicad_pcb` 的 S 表达式（需要完整文件，即 checkout），比较网络、元件、封装；上面的 churn 启发式只读 patch。")
+    add("- 用 `kicad-cli`（本机在 /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli）对前后状态跑 DRC / ERC，保留错误数不增加的事件。")
+    add(f"- 人工审阅 A 级种子集：`{SEED_CSV_PATH}`。")
+    add("- 新增的 29279 个仓库拉完后重跑（Release C）。")
     REPORT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     import csv

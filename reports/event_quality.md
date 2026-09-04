@@ -1,95 +1,95 @@
-# Improvement event quality report
+# 改进事件质量报告
 
-Generated 2026-09-03T21:24:27.508755+00:00 by `scripts/10_analyze_event_quality.py` over 523908 events (stage 08) for the 39902 repos found by `.kicad_pro`. Flags per event are in `data/cache/event_quality/state.sqlite`, table `event_quality`.
+生成时间 2026-09-04T02:01:40.587888+00:00，由 `scripts/10_analyze_event_quality.py` 对阶段 08 的 523908 个事件计算，覆盖 `.kicad_pro` 搜到的 39902 个仓库。每个事件的标志在 `data/cache/event_quality/state.sqlite` 的 `event_quality` 表。
 
-## Filters
+## 过滤规则
 
-| filter | rule |
+| 过滤 | 规则 |
 |---|---|
-| scope | event inside a qualified project dir; PR events must be merged; at least one `.kicad_pcb` changed |
-| text | title + body with checklists, HTML comments, quotes, sign-offs removed is >= 100 chars; not a PR template (checklist markers); < 50% TODO lines; not just issue numbers / URLs |
-| size | added + deleted lines over the event's KiCad files <= 8000; total changed files <= 40 |
-| modified only | every KiCad file has status `modified`, so before and after states pair up |
-| semantics | from the patch text, changed lines whose leading token is not save-time churn (`uuid`, `tstamp`, `version`, `generator`, ...) >= 5; this is a proxy for a netlist comparison, which needs the full files |
-| quota | at most 20 events per repo, best tier then longest text first |
+| 范围 | 事件落在合格工程目录内；PR 事件必须已合并；至少改动一个 `.kicad_pcb` |
+| 文本 | 标题 + 正文去掉 checklist、HTML 注释、引用、签名后 >= 100 字；不是 PR 模板（checklist 标记）；TODO 行 < 50%；不是纯 issue 编号 / URL |
+| 规模 | 事件内 KiCad 文件的增删行合计 <= 8000；改动文件总数 <= 40 |
+| 只改已有文件 | 每个 KiCad 文件状态都是 `modified`，保证前后状态一一对应 |
+| 语义 | 从 patch 文本看，行首 token 不属于存盘 churn（`uuid`、`tstamp`、`version`、`generator` 等）的改动行 >= 5；这是网表比较的代理，完整比较需要整个文件 |
+| 限额 | 每个仓库最多 20 个事件，先按等级再按文本长度 |
 
-Tiers: **A** all filters pass and an issue is linked; **B** all filters pass; **C** text / size / modified pass but GitHub omitted the patch (large file), semantics unknown; **X** excluded.
+等级：**A** 全部通过且关联 issue；**B** 全部通过；**C** 文本 / 规模 / modified 通过但 GitHub 省略了 patch（文件过大），语义未知；**X** 排除。
 
-## Funnel: PR events
+## 漏斗：PR 事件
 
-| step | events | repos |
+| 步骤 | 事件 | 仓库 |
 |---|---|---|
-| all events | 33844 | 4418 |
-| inside a qualified project dir | 16372 | 3520 |
-| PR merged (commits always pass) | 14200 | 3197 |
-| .kicad_pcb changed | 12152 | 3022 |
-| text: cleaned body >= 100 chars, no template / TODO / refs-only | 3534 | 1125 |
-| size: KiCad lines <= 8000 and changed files <= 40 | 1066 | 435 |
-| all KiCad files modified (no add / rename / remove) | 855 | 325 |
-| patch text available | 511 | 190 |
-| semantic changed lines >= 5 (not save-only churn) | 328 | 169 |
-| within per-repo quota of 20 | 283 | 168 |
+| 全部事件 | 33844 | 4418 |
+| 落在合格工程目录内 | 16372 | 3520 |
+| PR 已合并（commit 一律通过） | 14200 | 3197 |
+| 改动了 .kicad_pcb | 12152 | 3022 |
+| 文本：清洗后正文 >= 100 字，非模板 / TODO / 纯引用 | 3534 | 1125 |
+| 规模：KiCad 改动行 <= 8000，改动文件 <= 40 | 1066 | 435 |
+| KiCad 文件全为 modified（无 added / renamed / removed） | 855 | 325 |
+| patch 文本可用 | 511 | 190 |
+| 语义改动行 >= 5（非只存盘 churn） | 328 | 169 |
+| 仓库限额 20 以内 | 283 | 168 |
 
-## Funnel: commit events
+## 漏斗：commit 事件
 
-| step | events | repos |
+| 步骤 | 事件 | 仓库 |
 |---|---|---|
-| all events | 490064 | 32026 |
-| inside a qualified project dir | 490064 | 32026 |
-| PR merged (commits always pass) | 490064 | 32026 |
-| .kicad_pcb changed | 275885 | 31972 |
-| text: cleaned body >= 100 chars, no template / TODO / refs-only | 23086 | 5138 |
-| size: KiCad lines <= 8000 and changed files <= 40 | 10456 | 2899 |
-| all KiCad files modified (no add / rename / remove) | 8444 | 2359 |
-| patch text available | 4398 | 1429 |
-| semantic changed lines >= 5 (not save-only churn) | 3957 | 1372 |
-| within per-repo quota of 20 | 3416 | 1372 |
+| 全部事件 | 490064 | 32026 |
+| 落在合格工程目录内 | 490064 | 32026 |
+| PR 已合并（commit 一律通过） | 490064 | 32026 |
+| 改动了 .kicad_pcb | 275885 | 31972 |
+| 文本：清洗后正文 >= 100 字，非模板 / TODO / 纯引用 | 23086 | 5138 |
+| 规模：KiCad 改动行 <= 8000，改动文件 <= 40 | 10456 | 2899 |
+| KiCad 文件全为 modified（无 added / renamed / removed） | 8444 | 2359 |
+| patch 文本可用 | 4398 | 1429 |
+| 语义改动行 >= 5（非只存盘 churn） | 3957 | 1372 |
+| 仓库限额 20 以内 | 3416 | 1372 |
 
-## Tiers
+## 分层
 
-| tier | PR events | commit events | repos |
+| 等级 | PR 事件 | commit 事件 | 仓库 |
 |---|---|---|---|
 | A | 70 | 130 | 57 |
 | B | 258 | 3827 | 1411 |
 | C | 344 | 4046 | 1722 |
 | X | 33172 | 482061 | 32544 |
 
-Final pool (tiers A + B within quota): **3699** events from **1441** repos (283 PR, 3416 commit); quota removed 586 events.
+最终池（A + B 且在限额内）：**3699** 个事件，来自 **1441** 个仓库（PR 283，commit 3416）；限额去掉 586 个。
 
-## Why events are excluded
+## 排除原因
 
-Counted over eligible events (qualified dir, merged or commit, pcb changed); an event can fail several filters.
+在范围内事件（合格目录、已合并或 commit、改了 pcb）上统计；一个事件可能同时不过多个过滤。
 
-| reason | PR events | commit events |
+| 原因 | PR 事件 | commit 事件 |
 |---|---|---|
-| text | 8618 | 252799 |
-| size | 8653 | 136734 |
-| not_modified_only | 6062 | 88818 |
-| save_only_churn | 183 | 441 |
+| 文本 | 8618 | 252799 |
+| 规模 | 8653 | 136734 |
+| 含 added / renamed / removed | 6062 | 88818 |
+| 只存盘 churn | 183 | 441 |
 
-Text failures broken down:
+文本不合格的细分：
 
-| sub-reason | PR events | commit events |
+| 细分 | PR 事件 | commit 事件 |
 |---|---|---|
-| cleaned body shorter than threshold | 8016 | 252743 |
-| PR template | 585 | 14 |
-| TODO-dominated | 2 | 80 |
-| issue numbers / URLs only | 149 | 2417 |
+| 清洗后正文短于阈值 | 8016 | 252743 |
+| PR 模板 | 585 | 14 |
+| TODO 为主 | 2 | 80 |
+| 只有 issue 编号 / URL | 149 | 2417 |
 
-## Save-only churn
+## 只存盘 churn
 
-4909 events had patch text for every KiCad file. Semantic vs churn changed lines:
+4909 个事件的每个 KiCad 文件都有 patch 文本。语义行与 churn 行：
 
-| | events | median semantic lines | median churn lines | churn-only events |
+| | 事件 | 语义行中位数 | churn 行中位数 | 只有 churn 的事件 |
 |---|---|---|---|---|
 | pull_request | 511 | 24 | 3 | 183 |
 | commit | 4398 | 165 | 4 | 441 |
 
-## Repo concentration
+## 仓库集中度
 
-Top repos by tier A + B events before the quota:
+限额前 A + B 事件最多的仓库：
 
-| repo | A + B events | kept by quota |
+| 仓库 | A + B 事件 | 限额后保留 |
 |---|---|---|
 | sabas0ba/kicad_skills | 158 | 20 |
 | LastZactionHero/defcon-silent-disco | 110 | 20 |
@@ -104,29 +104,29 @@ Top repos by tier A + B events before the quota:
 | EwoudVV/ducktop2 | 34 | 20 |
 | v3l0c1r4pt0r/ucm4 | 30 | 20 |
 
-## 3D models in qualified repos
+## 合格仓库中的 3D 模型
 
-Of 32029 qualified repos, 16977 ship at least one 3D model file (.step, .stp, .wrl, .stl, .iges, .igs, .3mf, .obj, .f3d, .fcstd, .scad); 10492 have one inside a project dir. Files by suffix: .obj 153016, .step 134340, .stl 67954, .stp 37827, .wrl 32117, .scad 19855, .fcstd 11431, .3mf 10295, .f3d 3674, .igs 565, .iges 317. Table `repo_3d_models`.
+32029 个合格仓库中，16977 个至少带一个 3D 模型文件（.step, .stp, .wrl, .stl, .iges, .igs, .3mf, .obj, .f3d, .fcstd, .scad）；10492 个在工程目录内。按后缀的文件数：.obj 153016，.step 134340，.stl 67954，.stp 37827，.wrl 32117，.scad 19855，.fcstd 11431，.3mf 10295，.f3d 3674，.igs 565，.iges 317。见表 `repo_3d_models`。
 
-## Samples
+## 样本
 
-### Tier A
+### A 级
 
-- **rjwalters/kicad-tools** commit a133e6a270, dir `boards/03-usb-joystick/output`, pcb 1 sch 0 pro 0, semantic 272 churn 34 lines, text 4496 chars, issues [3532, 3535, 3545]. *fix(router): 45° quantization in post-route mutation passes (closes #3532) (#3537)* [link](https://github.com/rjwalters/kicad-tools/commit/a133e6a2708e4ab3a9e641091493320c79f0f119)
-- **rjwalters/kicad-tools** PR #4045, dir `boards/00-simple-led/output`, pcb 2 sch 0 pro 0, semantic 8 churn 0 lines, text 4210 chars, issues [4034]. *fix(3d): offset canonical STEP models onto origin-centered pads by pad-centroid delta* [link](https://github.com/rjwalters/kicad-tools/pull/4045)
-- **broncoracing/bcm** PR #14, dir `pcb`, pcb 1 sch 2 pro 0, semantic 21 churn 3 lines, text 112 chars, issues [13]. *Correct PCB to fix firmware flashing* [link](https://github.com/broncoracing/bcm/pull/14)
-- **amachronic/echoplayer** commit e14b09d176, dir `r1-rev2`, pcb 1 sch 0 pro 0, semantic 12 churn 60 lines, text 198 chars, issues [12]. *Fix incorrect 3.5mm jack pinout* [link](https://github.com/amachronic/echoplayer/commit/e14b09d176ed4ae50ebee3c8a1b28d569ed9379b)
+- **spacelab-ufsc/pc104-adapter** commit 72978706ff，目录 `/`，pcb 1 sch 0 pro 0，语义 834 行 churn 4 行，文本 115 字，issue [3]。*bottom-board: layout: Fixing the PC-104 outline (silk screen) and adding a label with the board name* [链接](https://github.com/spacelab-ufsc/pc104-adapter/commit/72978706ff397f3ddf600666e1ed5b88997e9526)
+- **nielsverhoeven/PoE-FanController** commit 92e69c7dab，目录 `hardware/kicad`，pcb 1 sch 1 pro 0，语义 246 行 churn 77 行，文本 2400 字，issue [40]。*hw(pcb): fix DRC violations from ESP32-P4 layout -- J1 footprint + placement (#40)* [链接](https://github.com/nielsverhoeven/PoE-FanController/commit/92e69c7dab3576d3d744fe9c62401113ac47f6da)
+- **nielsverhoeven/PoE-FanController** commit 6f8b905e63，目录 `hardware/kicad`，pcb 1 sch 0 pro 1，语义 895 行 churn 118 行，文本 765 字，issue [75]。*hw(pcb): portrait layout 42x78mm, J8 repositioned per constitution v3.1.0* [链接](https://github.com/nielsverhoeven/PoE-FanController/commit/6f8b905e63a310fa9a67fdc973318f9555ae7e0e)
+- **open-ephys/ephys-test-board** PR #45，目录 `pcb`，pcb 1 sch 1 pro 1，语义 499 行 churn 59 行，文本 112 字，issue [41]。*Add bypass for battery protection circuit* [链接](https://github.com/open-ephys/ephys-test-board/pull/45)
 
-### Tier B
+### B 级
 
-- **CamelCaseName/Nano33IOTShield** commit 5ea903aa1c, dir `/`, pcb 1 sch 1 pro 0, semantic 80 churn 10 lines, text 131 chars, issues []. *Forgot to set OE high when power is connected* [link](https://github.com/CamelCaseName/Nano33IOTShield/commit/5ea903aa1c8c67400001ea037d9dd4bb3b684a42)
-- **hdlguy/kicad** commit 3254496826, dir `zmod_m2_ssd`, pcb 1 sch 1 pro 0, semantic 622 churn 15 lines, text 108 chars, issues []. *Rev B of zmod M.2, changed clock buffer to give full edge rate, reduced M.2 mounting hole from 2.7 t* [link](https://github.com/hdlguy/kicad/commit/32544968268f2c206f2fd40ef891add6155ef4e9)
-- **Stab-Rabbit-coding/Open-Secure-ESC** commit c0bafe31af, dir `builds/6s/50A/CAN_485_faraday/kicad`, pcb 1 sch 0 pro 0, semantic 453 churn 90 lines, text 2778 chars, issues []. *Assembly prep for professional reflow; correct the routing state* [link](https://github.com/Stab-Rabbit-coding/Open-Secure-ESC/commit/c0bafe31af89ca2e3deae91d0501033ee18a90d0)
-- **lhr-solar/PS-PowerBoard** commit 248603deca, dir `/`, pcb 1 sch 0 pro 0, semantic 86 churn 0 lines, text 104 chars, issues []. *Merge pull request #36 from corbosiny/garrettW* [link](https://github.com/lhr-solar/PS-PowerBoard/commit/248603deca7ad97c6a18e58687cf5d5d31e33062)
+- **OpenDrone-hw/OpenESC-30x30** commit 63119a4f0f，目录 `hardware`，pcb 1 sch 0 pro 0，语义 688 行 churn 8 行，文本 212 字，issue []。*Rebrand back silkscreen to incutec, 4.7uF bulk caps on board* [链接](https://github.com/OpenDrone-hw/OpenESC-30x30/commit/63119a4f0f041316157fbf0d3bf13e6b7f86bf2d)
+- **tnl3pdx/SleepBud** commit a5678791ff，目录 `KiCad Schematics/SleepBud`，pcb 1 sch 1 pro 0，语义 42 行 churn 52 行，文本 131 字，issue []。*PCB Done Needs Checking Over* [链接](https://github.com/tnl3pdx/SleepBud/commit/a5678791ff23c33bdb8be031b1187fe799e45b99)
+- **10-X-eng/KiChad** commit c62b9aad23，目录 `qa/data/pcbnew`，pcb 1 sch 0 pro 0，语义 55 行 churn 11 行，文本 181 字，issue []。*API: Avoid redundant serialization of polyline arcs* [链接](https://github.com/10-X-eng/KiChad/commit/c62b9aad23f88a5beb2a5f50a8b3a862e2f2b1b3)
+- **portlandrobotics/common_platform** PR #14，目录 `hardware/romi_board`，pcb 1 sch 0 pro 0，语义 577 行 churn 10 行，文本 102 字，issue []。*Fix power/ground terminal swap* [链接](https://github.com/portlandrobotics/common_platform/pull/14)
 
-## Next steps
+## 下一步
 
-- Netlist comparison: parse `.kicad_sch` / `.kicad_pcb` S-expressions at before and after sha (needs the full files, i.e. a checkout) and compare nets, components, footprints; the churn heuristic above only reads patches.
-- DRC / ERC with `kicad-cli` (found at /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli) on both states; keep events whose error counts do not grow.
-- Manual review of the tier A seed set: `reports/seed_issue_driven_prs.csv`.
-- Rerun after the 29279 added repos are fetched (Release C).
+- 网表比较：在改动前后 sha 上解析 `.kicad_sch` / `.kicad_pcb` 的 S 表达式（需要完整文件，即 checkout），比较网络、元件、封装；上面的 churn 启发式只读 patch。
+- 用 `kicad-cli`（本机在 /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli）对前后状态跑 DRC / ERC，保留错误数不增加的事件。
+- 人工审阅 A 级种子集：`reports/seed_issue_driven_prs.csv`。
+- 新增的 29279 个仓库拉完后重跑（Release C）。
