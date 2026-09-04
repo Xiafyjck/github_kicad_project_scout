@@ -135,22 +135,39 @@ flowchart TB
     classDef note fill:#fff8dc,stroke:#c9a400,color:#333
     classDef exit fill:#f4f4f4,stroke:#999,color:#555
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
+    classDef src fill:#f3e8ff,stroke:#7c4dbd,color:#111
 
-    N1[/"代码搜索四种后缀，按文件大小二分绕过 1000 条上限，四路并集<br/>搜索只索引 384 KB 以下文件，.kicad_pro 最可靠"/]:::note
-    C[候选仓库 69181<br/>四路并集]:::keep
+    subgraph S[代码搜索，四路各自缓存]
+        direction LR
+        K1[extension:kicad_pro<br/>39902 仓库，3224 个大小区间]:::src
+        K2[extension:kicad_pcb<br/>26676 仓库，2602 个区间]:::src
+        K3[extension:kicad_sch<br/>37202 仓库，4604 个区间]:::src
+        K4[extension:sch<br/>30515 仓库，8914 个区间]:::src
+    end
+    L1[/"接口只索引 384 KB 以下文件<br/>.kicad_pcb 近半超限，.kicad_pro 最小最可靠"/]:::note
+    L2[/"单条查询最多 1000 条<br/>按 size:a..b 二分区间，直到每段可被 10 页枚举"/]:::note
+    L1 -.- S
+    L2 -.- S
+
+    C[候选仓库 69181<br/>四路按仓库 id 去重并集]:::keep
     C6[KiCad 6+ 候选 50796<br/>前三路任一命中]:::keep
     A[分析仓库 39902<br/>第一版 .kicad_pro 命中]:::keep
-    CX([未分析 29279，待 Release C]):::exit
-    N2[/"Tree API 拉整仓库文件列表，本地判定：<br/>同目录有 pro + pcb + sch，且附近有 README"/]:::note
+    CX([未分析 29279<br/>待 Release C]):::exit
+    K1 --> C
+    K2 --> C
+    K3 --> C
+    K4 --> C
+    C --> C6 --> A
+    C6 -.-> CX
+
+    T[/"Tree API 一次拉整仓库递归文件列表<br/>不读文件内容"/]:::note
+    R[/"工程目录 = 同目录有 .kicad_pro + .kicad_pcb + .kicad_sch<br/>且本目录 / 上级 / 根目录有 README"/]:::note
     Q[完整工程仓库 32029（80%）<br/>工程目录 66793]:::keep
     AX1([已删除 4]):::exit
     AX2([文件树被截断 21]):::exit
     AX3([无完整工程目录 7848]):::exit
-
-    N1 -.- C
-    C --> C6 --> A
-    C6 -.-> CX
-    N2 -.- Q
+    T -.- Q
+    R -.- Q
     A --> Q
     A -.-> AX1
     A -.-> AX2
@@ -164,15 +181,38 @@ flowchart TB
     classDef note fill:#fff8dc,stroke:#c9a400,color:#333
     classDef exit fill:#f4f4f4,stroke:#999,color:#555
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
+    classDef src fill:#f3e8ff,stroke:#7c4dbd,color:#111
 
-    N3[/"全量拉原始响应，判断在本地：<br/>按目录查提交、全部 PR 及其改动文件、全部 issue，再补 42.3 万 commit 的改动文件"/]:::note
-    N4[/"事件 = 一次改动 × 一个工程目录<br/>PR：前 base，后 merge；commit：前父提交，后自身"/]:::note
-    N5[/"底线：工程目录内、PR 已合并、改了 .kicad_pcb"/]:::note
+    Q[完整工程仓库 32029<br/>及其余分析仓库]:::keep
+    subgraph H[拉取，原始响应全部缓存]
+        direction LR
+        H0[GraphQL 活跃度<br/>39895 仓库，1597 次]:::src
+        H1[按工程目录查提交<br/>897459 个 commit]:::src
+        H2[全部 PR<br/>140678 个]:::src
+        H3[PR 改动文件<br/>345 万，自带逐行差异]:::src
+        H4[全部 issue<br/>97849 个（去掉 PR）]:::src
+        H5[commit 改动文件<br/>42.3 万 commit，887 万文件]:::src
+    end
+    Q --> H
 
-    Q[完整工程仓库 32029]:::keep
+    D1[/"事件 = 一次改动 × 一个工程目录<br/>一个 PR 改 3 个目录记 3 条"/]:::note
+    D2[/"PR 事件：前 = base commit，后 = merge commit（缺则分支头）"/]:::note
+    D3[/"commit 事件：前 = 第一个父提交，后 = 自身"/]:::note
+    D4[/"每条记：KiCad 文件清单与状态、增删行、<br/>pcb / sch / pro 计数、#N 引用的 issue"/]:::note
     E[改进事件 523908]:::keep
+    H --> E
+    D1 -.- E
+    D4 -.- E
     P[PR 事件 33844<br/>= 18348 个 KiCad PR]:::keep
     M[commit 事件 490064<br/>= 423293 个 commit]:::keep
+    E --> P
+    E --> M
+    D2 -.- P
+    D3 -.- M
+
+    B1[/"底线一：落在工程目录内"/]:::note
+    B2[/"底线二：PR 已合并，commit 不要求"/]:::note
+    B3[/"底线三：至少改了一个 .kicad_pcb"/]:::note
     P1[目录内 16372]:::keep
     P2[已合并 14200]:::keep
     P3[底线 PR 事件 12152<br/>= 8719 个 PR，3022 仓库]:::keep
@@ -181,20 +221,16 @@ flowchart TB
     PX2([未合并 2172]):::exit
     PX3([只改 sch / pro 2048]):::exit
     MX3([只改 sch / pro 或无 KiCad 文件 214179]):::exit
-
-    N3 -.- E
-    N4 -.- E
-    Q --> E
-    E --> P
-    E --> M
-    N5 -.- P3
-    N5 -.- M3
     P --> P1 --> P2 --> P3
     P -.-> PX1
     P1 -.-> PX2
     P2 -.-> PX3
     M --> M3
     M -.-> MX3
+    B1 -.- P1
+    B2 -.- P2
+    B3 -.- P3
+    B3 -.- M3
 ```
 
 图 3：五道筛，PR 支路
@@ -205,11 +241,11 @@ flowchart TB
     classDef exit fill:#f4f4f4,stroke:#999,color:#555
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
 
-    Nb[/"文字：清洗后 ≥ 100 字，非模板 / TODO / 纯编号"/]:::note
-    Nc[/"规模：KiCad 增删行 ≤ 8000，改动文件 ≤ 40"/]:::note
-    Nd[/"修改：KiCad 文件全为 modified"/]:::note
-    Ne[/"存盘：去掉 uuid / tstamp / version 行后真实改动 ≥ 5 行"/]:::note
-    Nf[/"限额：每仓库 ≤ 20，优先有 issue、说明长"/]:::note
+    Nb[/"文字筛：标题 + 正文去掉 checklist / HTML 注释 / 引用 / 签名后 ≥ 100 字"/]:::note
+    Nc[/"规模筛：KiCad 增删行 ≤ 8000，改动文件 ≤ 40"/]:::note
+    Nd[/"修改筛：KiCad 文件全为 modified"/]:::note
+    Ne[/"存盘筛：去掉 uuid / tstamp / version / generator 行后真实改动 ≥ 5 行"/]:::note
+    Nf[/"限额筛：每仓库 ≤ 20，优先有 issue、说明长"/]:::note
 
     P3[底线 PR 事件 12152]:::keep
     P4[文字合格 3534]:::keep
@@ -218,7 +254,13 @@ flowchart TB
     P7[有逐行差异 511]:::keep
     P8[真实改动 328]:::keep
     P9[限额后 283]:::keep
-    PX4([太短 / 模板 / 纯编号 8618]):::exit
+    subgraph TX[文字不合格 8618，可重叠]
+        direction LR
+        PX4a([太短 8016]):::exit
+        PX4b([PR 模板 585]):::exit
+        PX4c([纯 issue 号 / 链接 149]):::exit
+        PX4d([TODO 为主 2]):::exit
+    end
     PX5([改动过大 2468]):::exit
     PX6([含新增 / 改名 / 删除 211]):::exit
     PX7([无 patch 344，C 级]):::exit
@@ -231,7 +273,7 @@ flowchart TB
     Ne -.- P7
     Nf -.- P9
     P3 --> P4 --> P5 --> P6 --> P7 --> P8 --> P9
-    P3 -.-> PX4
+    P3 -.-> TX
     P4 -.-> PX5
     P5 -.-> PX6
     P6 -.-> PX7
@@ -248,8 +290,10 @@ flowchart TB
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
     classDef final fill:#e6f7e6,stroke:#2e8b57,color:#111
 
-    Ng[/"筛法同图 3；commit 多数只有一行标题，文字筛损失最大"/]:::note
-    Nh[/"A 级 = 全过且引用本仓库 issue；B 级 = 全过；C 级 = 无 patch 待定"/]:::note
+    Ng[/"筛法同图 3；commit 文字 = 提交标题 + 正文"/]:::note
+    Na[/"A 级：全过且说明引用本仓库 issue"/]:::note
+    Nbb[/"B 级：全过"/]:::note
+    Ncc[/"C 级：文字 / 规模 / 修改过，无 patch 待定"/]:::note
 
     M3[底线 commit 事件 275885]:::keep
     M4[文字合格 23086]:::keep
@@ -258,7 +302,12 @@ flowchart TB
     M7[有逐行差异 4398]:::keep
     M8[真实改动 3957]:::keep
     M9[限额后 3416]:::keep
-    MX4([只有一行标题等 252799]):::exit
+    subgraph TY[文字不合格 252799，可重叠]
+        direction LR
+        MX4a([只有一行标题等 252743]):::exit
+        MX4b([纯 issue 号 / 链接 2417]):::exit
+        MX4c([TODO 为主 80]):::exit
+    end
     MX5([改动过大 12630]):::exit
     MX6([含新增 / 改名 / 删除 2012]):::exit
     MX7([无 patch 4046，C 级]):::exit
@@ -269,20 +318,24 @@ flowchart TB
     F[最终池 3699 事件<br/>1441 仓库]:::final
     G[A 级 200 事件，57 仓库]:::final
     FB([B 级 3499]):::exit
+    FC([C 级 4390，两支合计]):::exit
 
     Ng -.- M4
     M3 --> M4 --> M5 --> M6 --> M7 --> M8 --> M9
-    M3 -.-> MX4
+    M3 -.-> TY
     M4 -.-> MX5
     M5 -.-> MX6
     M6 -.-> MX7
     M7 -.-> MX8
     M8 -.-> MX9
-    Nh -.- F
     M9 --> F
     P9 --> F
     F --> G
     F -.-> FB
+    MX7 -.-> FC
+    Na -.- G
+    Nbb -.- FB
+    Ncc -.- FC
 ```
 
 **结论**
