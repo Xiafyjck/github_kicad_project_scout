@@ -140,30 +140,24 @@ flowchart TB
     classDef src fill:#f3e8ff,stroke:#7c4dbd,color:#111
     classDef rule fill:#fff8dc,stroke:#c9a400,color:#333
 
-    subgraph L[代码搜索的限制与应对]
-        direction LR
-        L1[只索引 384 KB 以下文件]:::rule --> L2[.kicad_pcb 近半搜不到<br/>.kicad_pro 最小最可靠]:::rule
-        L3[单条查询最多 1000 条]:::rule --> L4[按 size 区间二分<br/>直到每段可被 10 页枚举]:::rule
-    end
+    L1[搜索限制一：只索引 384 KB 以下文件，.kicad_pcb 近半搜不到，.kicad_pro 最小最可靠]:::rule
+    L2[搜索限制二：单条查询最多 1000 条，按 size 区间二分，直到每段可被 10 页枚举]:::rule
     subgraph S[四路搜索，各自缓存]
         direction LR
-        K1[extension:kicad_pro<br/>39902 仓库<br/>3224 个区间]:::src
-        K2[extension:kicad_pcb<br/>26676 仓库<br/>2602 个区间]:::src
-        K3[extension:kicad_sch<br/>37202 仓库<br/>4604 个区间]:::src
-        K4[extension:sch<br/>30515 仓库<br/>8914 个区间]:::src
+        K1[extension:kicad_pro<br/>39902 仓库，3224 个区间]:::src
+        K2[extension:kicad_pcb<br/>26676 仓库，2602 个区间]:::src
+        K3[extension:kicad_sch<br/>37202 仓库，4604 个区间]:::src
+        K4[extension:sch<br/>30515 仓库，8914 个区间]:::src
     end
-    L --> S
-    S --> C[候选仓库 69181<br/>四路按仓库 id 去重并集]:::keep
-    C --> C6[KiCad 6+ 候选 50796<br/>前三路任一命中]:::keep
-    C6 --> A[分析仓库 39902<br/>第一版 .kicad_pro 命中，后续数字都在此集合上]:::keep
-    C6 -.-> CX([未分析 29279<br/>待 Release C]):::exit
-    A --> T[拉文件树：Tree API 一次拉整仓库递归文件列表，不读内容]:::rule
-    subgraph R[完整工程目录的判定规则]
-        direction LR
-        R1[同一目录同时有<br/>.kicad_pro + .kicad_pcb + .kicad_sch]:::rule --> R2[本目录 / 上级 / 根目录<br/>有 README]:::rule --> R3[按当前 HEAD<br/>文件树判定]:::rule
-    end
-    T --> R
-    R --> Q[完整工程仓库 32029（80%）<br/>工程目录 66793]:::keep
+    L1 --> S
+    L2 --> S
+    S --> C[候选仓库 69181，四路按仓库 id 去重并集]:::keep
+    C --> C6[KiCad 6+ 候选 50796，前三路任一命中]:::keep
+    C6 --> A[分析仓库 39902，第一版 .kicad_pro 命中，后续数字都在此集合上]:::keep
+    C6 -.-> CX([未分析 29279，待 Release C]):::exit
+    A --> T[拉文件树：Tree API 一次拉整仓库递归文件列表，不读文件内容]:::rule
+    T --> R[工程目录规则：同一目录同时有 .kicad_pro + .kicad_pcb + .kicad_sch，且本目录 / 上级 / 根目录有 README，按当前 HEAD 文件树判定]:::rule
+    R --> Q[完整工程仓库 32029（80%），工程目录 66793]:::keep
     T -.-> AX1([已删除 4]):::exit
     T -.-> AX2([文件树被截断 21]):::exit
     R -.-> AX3([无完整工程目录 7848]):::exit
@@ -180,7 +174,7 @@ flowchart TB
     classDef src fill:#f3e8ff,stroke:#7c4dbd,color:#111
     classDef rule fill:#fff8dc,stroke:#c9a400,color:#333
 
-    Q[分析仓库 39902<br/>含完整工程仓库 32029]:::keep
+    Q[分析仓库 39902，含完整工程仓库 32029]:::keep
     subgraph H[拉取六类原始响应，全部缓存，判断在本地]
         direction LR
         H0[GraphQL 活跃度<br/>39895 仓库，1597 次]:::src
@@ -191,32 +185,22 @@ flowchart TB
         H5[commit 改动文件<br/>42.3 万 commit，887 万文件]:::src
     end
     Q --> H
-    H --> E[改进事件 523908<br/>事件 = 一次改动 × 一个工程目录]:::keep
-    subgraph D[每条事件记录的内容]
-        direction LR
-        D1[落在该目录的<br/>KiCad 文件清单与状态]:::rule --> D2[增删行]:::rule --> D3[pcb / sch / pro<br/>各几个]:::rule --> D4[总改动文件数]:::rule --> D5[引用并确认存在的<br/>issue 编号]:::rule
-    end
-    E --- D
-    subgraph PR[PR 事件入选与前后状态]
-        direction LR
-        PR1[PR 改了至少一个<br/>KiCad 文件]:::rule --> PR2[按 KiCad 文件所在的<br/>工程目录分条]:::rule --> PR3[改动前版本 = PR 所基于的主干提交<br/>改动后版本 = 合并后的提交，GitHub 未给时用 PR 分支最后一次提交]:::rule
-    end
-    subgraph CM[commit 事件入选与前后状态]
-        direction LR
-        CM1[按目录查询返回的<br/>每个提交]:::rule --> CM2[目录下任意文件改动都算<br/>README、gerber 也算]:::rule --> CM3[改动前版本 = 该提交的父提交<br/>改动后版本 = 该提交本身]:::rule
-    end
-    E --> PR --> P[PR 事件 33844<br/>= 18348 个 KiCad PR]:::keep
-    E --> CM --> M[commit 事件 490064<br/>= 423293 个 commit]:::keep
+    H --> E[改进事件 523908，事件 = 一次改动 × 一个工程目录]:::keep
+    E --> D[每条事件记录：落在该目录的 KiCad 文件清单与状态、增删行、pcb / sch / pro 各几个、总改动文件数、引用并确认存在的 issue 编号]:::rule
+    D --> PR[PR 事件入选：PR 改了至少一个 KiCad 文件，按 KiCad 文件所在的工程目录分条；改动前版本 = PR 所基于的主干提交，改动后版本 = 合并后的提交，GitHub 未给时用 PR 分支最后一次提交]:::rule
+    D --> CM[commit 事件入选：按目录查询返回的每个提交，目录下任意文件改动都算，README、gerber 也算；改动前版本 = 该提交的父提交，改动后版本 = 该提交本身]:::rule
+    PR --> P[PR 事件 33844 = 18348 个 KiCad PR]:::keep
+    CM --> M[commit 事件 490064 = 423293 个 commit]:::keep
 
-    P --> P1[底线一：KiCad 文件所在目录是完整工程目录<br/>剩 16372]:::keep
-    P1 -.-> PX1([不在完整工程目录内 17472<br/>仍是 KiCad 改动，目录在 HEAD 上不完整]):::exit
-    P1 --> P2[底线二：PR 已合并<br/>剩 14200]:::keep
+    P --> P1[底线一：KiCad 文件所在目录是完整工程目录，剩 16372]:::keep
+    P1 -.-> PX1([不在完整工程目录内 17472，仍是 KiCad 改动，目录在 HEAD 上不完整]):::exit
+    P1 --> P2[底线二：PR 已合并，剩 14200]:::keep
     P2 -.-> PX2([未合并 2172]):::exit
-    P2 --> P3[底线三：改了至少一个 .kicad_pcb<br/>底线 PR 事件 12152 = 8719 个 PR，3022 仓库]:::keep
+    P2 --> P3[底线三：改了至少一个 .kicad_pcb，底线 PR 事件 12152 = 8719 个 PR，3022 仓库]:::keep
     P3 -.-> PX3([只改 sch / pro 2048]):::exit
 
-    M --> M3[底线三：改了至少一个 .kicad_pcb<br/>底线 commit 事件 275885 = 237928 个 commit，31972 仓库]:::keep
-    M3 -.-> MX3([无 KiCad 文件 142900<br/>只改 sch / pro 71279]):::exit
+    M --> M3[底线三：改了至少一个 .kicad_pcb，底线 commit 事件 275885 = 237928 个 commit，31972 仓库]:::keep
+    M3 -.-> MX3([无 KiCad 文件 142900，只改 sch / pro 71279]):::exit
 ```
 
 讲解：上半是拉取。对分析仓库拉六类原始响应并全部缓存：GraphQL 一次查 25 个仓库拿活跃度；按每个工程目录查提交列表，去重后 897459 个 commit；全部 PR 140678 个；每个 PR 的改动文件 345 万条，接口自带逐行差异；全部 issue 去掉 PR 后 97849 个；再对触及工程目录的 42.3 万个 commit 逐个拉改动文件，共 887 万条。中间是构事件。事件定义为一次改动 × 一个工程目录，但 PR 与 commit 的入选条件不同：PR 事件只在 PR 改了至少一个 KiCad 文件时产生，按 KiCad 文件所在的工程目录分条，改动前是 base 提交、改动后是合并提交；commit 事件来自按目录查询的提交列表，目录下任意文件改动都会入选，README、gerber 也算，改动前是第一个父提交、改动后是它自己。每条事件记录落在该目录的 KiCad 文件清单与状态、增删行、pcb / sch / pro 各几个、总改动文件数、说明文字引用的 issue。共 523908 个事件，PR 事件 33844 个对应 18348 个 KiCad PR，commit 事件 490064 个对应 423293 个 commit。下半是底线。PR 支路依次筛：KiCad 文件所在目录是完整工程目录（筛掉 17472，这些仍是 KiCad 改动，只是目录在 HEAD 上不完整）、PR 已合并（筛掉 2172）、改了 .kicad_pcb（筛掉只改 sch / pro 的 2048），剩 12152 个底线 PR 事件，对应 8719 个 PR、3022 个仓库。commit 支路只筛"改了 .kicad_pcb"，筛掉 214179 条（无 KiCad 文件 142900 加只改 sch / pro 71279），剩 275885 个底线 commit 事件，对应 237928 个 commit、31972 个仓库。
@@ -229,24 +213,18 @@ flowchart TB
     classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
     classDef rule fill:#fff8dc,stroke:#c9a400,color:#333
 
-    subgraph RULES[五道筛的规则，每道管一个问题]
-        direction LR
-        Rb[文字筛，管有没有题面<br/>标题 + 正文去掉 checklist / HTML 注释 / 引用 / 签名后 ≥ 100 字]:::rule
-        Rc[规模筛，管是否一次可理解的修改<br/>KiCad 增删行 ≤ 8000，改动文件 ≤ 40]:::rule
-        Rd[修改筛，管前后状态能否对上<br/>KiCad 文件全为 modified]:::rule
-        Re[存盘筛，管是否真改了电路<br/>去掉 uuid / tstamp / version / generator 行后真实改动 ≥ 5 行]:::rule
-        Rf[限额筛，管少数仓库垄断<br/>每仓库 ≤ 20，优先有 issue、说明长]:::rule
-        Rb --> Rc --> Rd --> Re --> Rf
-    end
-
     P3[底线 PR 事件 12152]:::keep
-    RULES --> P3
-    P3 --> P4[文字筛后 3534]:::keep
-    P4 --> P5[规模筛后 1066]:::keep
-    P5 --> P6[修改筛后 855]:::keep
-    P6 --> P7[有逐行差异 511]:::keep
-    P7 --> P8[存盘筛后 328]:::keep
-    P8 --> P9[限额筛后 283]:::keep
+    P3 --> Rb[文字筛，管有没有题面：标题 + 正文去掉 checklist / HTML 注释 / 引用 / 签名后 ≥ 100 字]:::rule
+    Rb --> P4[剩 3534]:::keep
+    P4 --> Rc[规模筛，管是否一次可理解的修改：KiCad 增删行 ≤ 8000，改动文件 ≤ 40]:::rule
+    Rc --> P5[剩 1066]:::keep
+    P5 --> Rd[修改筛，管前后状态能否对上：KiCad 文件全为 modified]:::rule
+    Rd --> P6[剩 855]:::keep
+    P6 --> Re[存盘筛，管是否真改了电路：先要有逐行差异，再去掉 uuid / tstamp / version / generator 行，真实改动 ≥ 5 行]:::rule
+    Re --> P7[有逐行差异 511]:::keep
+    P7 --> P8[真实改动 328]:::keep
+    P8 --> Rf[限额筛，管少数仓库垄断：每仓库 ≤ 20，优先有 issue、说明长]:::rule
+    Rf --> P9[剩 283]:::keep
 
     subgraph TX[文字不合格 8618，子原因可重叠]
         direction LR
@@ -255,12 +233,12 @@ flowchart TB
         PX4c([纯 issue 号 / 链接 149]):::exit
         PX4d([TODO 为主 2]):::exit
     end
-    P4 -.-> TX
-    P5 -.-> PX5([改动过大 2468]):::exit
-    P6 -.-> PX6([含新增 / 改名 / 删除 211]):::exit
-    P7 -.-> PX7([无 patch 344，C 级<br/>GitHub 对过大文件不返回 patch]):::exit
-    P8 -.-> PX8([只存盘 churn 183]):::exit
-    P9 -.-> PX9([超限额 45]):::exit
+    Rb -.-> TX
+    Rc -.-> PX5([改动过大 2468]):::exit
+    Rd -.-> PX6([含新增 / 改名 / 删除 211]):::exit
+    Re -.-> PX7([无 patch 344，C 级，GitHub 对过大文件不返回 patch]):::exit
+    P7 -.-> PX8([只存盘 churn 183]):::exit
+    Rf -.-> PX9([超限额 45]):::exit
 ```
 
 讲解：从 12152 个底线 PR 事件开始，五道筛各解决一个问题。文字筛管有没有题面：标题加正文去掉 checklist、HTML 注释、引用、签名后至少 100 字，筛掉 8618，子原因可重叠，太短 8016、PR 模板 585、纯 issue 编号或链接 149、TODO 为主 2，剩 3534。规模筛管是不是一次可理解的修改：KiCad 文件增删行合计不超过 8000、改动文件不超过 40，筛掉 2468，剩 1066。修改筛管前后状态能否对上：所有 KiCad 文件必须是 modified，含新增、改名、删除的筛掉 211，剩 855。存盘筛管是不是真改了电路：先要有逐行差异，GitHub 对过大文件不返回 patch，344 条记 C 级待定，剩 511；再去掉 uuid、tstamp、version、generator 这类存盘就会变的行，真实改动行至少 5 行，只有存盘 churn 的 183 条筛掉，剩 328。限额筛管少数仓库垄断：每仓库最多 20 条，优先有 issue 关联、说明长的，超限额 45 条，剩 283 进入最终池。
