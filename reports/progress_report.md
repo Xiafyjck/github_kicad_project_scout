@@ -143,11 +143,11 @@ flowchart TB
     L1[搜索限制一：只索引 384 KB 以下文件，.kicad_pcb 近半搜不到，.kicad_pro 最小最可靠]:::rule
     L2[搜索限制二：单条查询最多 1000 条，按 size 区间二分，直到每段可被 10 页枚举]:::rule
     subgraph S[四路搜索，各自缓存]
-        direction LR
-        K1[extension:kicad_pro<br/>39902 仓库，3224 个区间]:::src
-        K2[extension:kicad_pcb<br/>26676 仓库，2602 个区间]:::src
-        K3[extension:kicad_sch<br/>37202 仓库，4604 个区间]:::src
-        K4[extension:sch<br/>30515 仓库，8914 个区间]:::src
+        direction TB
+        K1[extension:kicad_pro，39902 仓库，3224 个区间]:::src
+        K2[extension:kicad_pcb，26676 仓库，2602 个区间]:::src
+        K3[extension:kicad_sch，37202 仓库，4604 个区间]:::src
+        K4[extension:sch，30515 仓库，8914 个区间]:::src
     end
     L1 --> S
     L2 --> S
@@ -176,13 +176,13 @@ flowchart TB
 
     Q[分析仓库 39902，含完整工程仓库 32029]:::keep
     subgraph H[拉取六类原始响应，全部缓存，判断在本地]
-        direction LR
-        H0[GraphQL 活跃度<br/>39895 仓库，1597 次]:::src
-        H1[按工程目录查提交<br/>897459 个 commit]:::src
-        H2[全部 PR<br/>140678 个]:::src
-        H3[PR 改动文件<br/>345 万，自带逐行差异]:::src
-        H4[全部 issue<br/>97849 个，已去掉 PR]:::src
-        H5[commit 改动文件<br/>42.3 万 commit，887 万文件]:::src
+        direction TB
+        H0[GraphQL 活跃度，39895 仓库，1597 次]:::src
+        H1[按工程目录查提交，897459 个 commit]:::src
+        H2[全部 PR，140678 个]:::src
+        H3[PR 改动文件，345 万，自带逐行差异]:::src
+        H4[全部 issue，97849 个，已去掉 PR]:::src
+        H5[commit 改动文件，42.3 万 commit，887 万文件]:::src
     end
     Q --> H
     H --> E[改进事件 523908，事件 = 一次改动 × 一个工程目录]:::keep
