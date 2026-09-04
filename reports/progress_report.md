@@ -88,59 +88,143 @@ GitHub 是代码托管平台。一个仓库（repo）是一个项目；提交（
 | A 级事件 | 最终池中说明文字明确引用了本仓库 issue 的 | 200 个事件，57 个仓库 |
 | issue | GitHub 的 issue 接口把 PR 也算作 issue；本报告说的 issue 均已去掉 PR | 97849 个（接口返回 238233 条） |
 
-筛网图：主干是保留的集合，虚线是每一层筛掉的部分及原因（数字为事件数，仓库层为仓库数）。
+筛网图：实线主干是每层保留的集合，虚线分叉是筛掉的部分和原因，黄色框是该层的方法与口径批注。数字在仓库层为仓库数，在事件层为事件数。
 
 ```mermaid
 flowchart TB
-    C[候选仓库 69181] --> A[分析仓库 39902<br/>.kicad_pro 命中]
-    C -.-> C1([未分析 29279<br/>仅被 .kicad_pcb / .kicad_sch / .sch 命中，待 Release C])
-    A --> Q[完整工程仓库 32029<br/>工程目录 66793]
-    A -.-> A1([已删除 4])
-    A -.-> A2([文件树被截断 21])
-    A -.-> A3([无完整工程目录 7848])
+    classDef note fill:#fff8dc,stroke:#c9a400,color:#333,text-align:left
+    classDef exit fill:#f4f4f4,stroke:#999,color:#555
+    classDef keep fill:#e8f1ff,stroke:#3b6fd6,color:#111
+    classDef final fill:#e6f7e6,stroke:#2e8b57,color:#111
 
-    Q --> E[改进事件 523908]
-    E --> P[PR 事件 33844<br/>18348 个 PR]
-    E --> M[commit 事件 490064<br/>423293 个 commit]
+    subgraph S1[① 找仓库：候选策略]
+        direction TB
+        N1[/"GitHub 代码搜索，按后缀 extension:kicad_pro 等四路分别搜<br/>接口限制：只索引 384 KB 以下文件、单条查询最多 1000 条<br/>应对：按文件大小二分区间直到每段可被 10 页枚举<br/>.kicad_pro 最小最可靠；.kicad_pcb 近半超 384 KB，单独用它只能找到 43% 的完整工程<br/>四路按仓库 id 去重取并集，搜索只用来发现仓库，不做任何判断"/]:::note
+        C[候选仓库 69181<br/>= 四路并集]:::keep
+        C6[KiCad 6+ 候选 50796<br/>= 被 .kicad_pro / .kicad_pcb / .kicad_sch 任一命中]:::keep
+        A[分析仓库 39902<br/>= 第一版 .kicad_pro 命中<br/>后续所有数字在此集合上统计]:::keep
+        CX([未分析 29279<br/>仅被其余三路命中，待 Release C]):::exit
+        N1 -.- C
+        C --> C6 --> A
+        C6 -.-> CX
+    end
 
-    P --> P1[工程目录内 16372]
-    P -.-> PX1([目录外 17472])
-    P1 --> P2[已合并 14200]
-    P1 -.-> PX2([未合并 2172])
-    P2 --> P3[改了 .kicad_pcb 12152<br/>8719 个 PR]
-    P2 -.-> PX3([只改 sch / pro 2048])
-    P3 --> P4[说明文字合格 3534]
-    P3 -.-> PX4([文字太短 / 模板 / 纯编号 8618])
-    P4 --> P5[规模合格 1066]
-    P4 -.-> PX5([改动过大 2468])
-    P5 --> P6[全为修改 855]
-    P5 -.-> PX6([含新增 / 改名 / 删除 211])
-    P6 --> P7[有逐行差异 511]
-    P6 -.-> PX7([文件过大无 patch 344<br/>C 级，语义待定])
-    P7 --> P8[真实改动 328]
-    P7 -.-> PX8([只存盘 churn 183])
-    P8 --> P9[限额后 283]
-    P8 -.-> PX9([超仓库限额 45])
+    subgraph S2[② 判完整：只看文件树]
+        direction TB
+        N2[/"Tree API 一次拉整个仓库的递归文件列表，本地判定：<br/>同一目录同时有 .kicad_pro + .kicad_pcb + .kicad_sch，<br/>且本目录、上级目录或仓库根目录有 README，记为一个工程目录<br/>不读文件内容；一个仓库可含多个工程目录"/]:::note
+        Q[完整工程仓库 32029（80%）<br/>工程目录 66793]:::keep
+        AX1([已删除 4]):::exit
+        AX2([文件树被 GitHub 截断 21<br/>大型杂项集合，放弃]):::exit
+        AX3([无完整工程目录 7848]):::exit
+        N2 -.- Q
+    end
+    A --> Q
+    A -.-> AX1
+    A -.-> AX2
+    A -.-> AX3
 
-    M --> M3[改了 .kicad_pcb 275885<br/>237928 个 commit]
-    M -.-> MX3([只改 sch / pro 或无 KiCad 文件 214179])
-    M3 --> M4[说明文字合格 23086]
-    M3 -.-> MX4([只有一行标题等 252799])
-    M4 --> M5[规模合格 10456]
-    M4 -.-> MX5([改动过大 12630])
-    M5 --> M6[全为修改 8444]
-    M5 -.-> MX6([含新增 / 改名 / 删除 2012])
-    M6 --> M7[有逐行差异 4398]
-    M6 -.-> MX7([文件过大无 patch 4046<br/>C 级，语义待定])
-    M7 --> M8[真实改动 3957]
-    M7 -.-> MX8([只存盘 churn 441])
-    M8 --> M9[限额后 3416]
-    M8 -.-> MX9([超仓库限额 541])
+    subgraph S3[③ 拉历史、构事件]
+        direction TB
+        N3[/"先全量拉原始响应，判断全在本地：<br/>GraphQL 批量拿活跃度；每仓库拉按工程目录查询的提交列表、全部 PR、PR 改动文件（自带逐行差异）、全部 issue；<br/>再对触及工程目录的 42.3 万 commit 逐个拉改动文件<br/>事件 = 一次改动 × 一个工程目录，一个 PR 改 3 个目录记 3 条<br/>PR 事件：前 = base commit，后 = merge commit（缺则 PR 分支头）<br/>commit 事件：前 = 第一个父提交，后 = 自身<br/>每条记 KiCad 文件清单与状态、增删行、pcb / sch / pro 计数、#N 引用的 issue"/]:::note
+        E[改进事件 523908]:::keep
+        P[PR 事件 33844<br/>= 18348 个 KiCad PR，4418 仓库<br/>KiCad PR：改动文件含任一 KiCad 文件，不限目录、不限是否合并]:::keep
+        M[commit 事件 490064<br/>= 423293 个工程目录提交]:::keep
+        N3 -.- E
+        E --> P
+        E --> M
+    end
+    Q --> E
 
-    P9 --> F[最终池 3699 事件<br/>1441 个仓库]
+    subgraph S4[④ 筛事件：底线 + 五道筛]
+        direction TB
+        N4a[/"底线：落在工程目录内、PR 已合并（commit 不要求）、至少改了一个 .kicad_pcb"/]:::note
+        N4b[/"文字筛，管有没有题面：标题 + 正文去掉 checklist、HTML 注释、引用、签名后 ≥ 100 字；PR 模板、TODO 清单、只有 issue 号或链接的不算"/]:::note
+        N4c[/"规模筛，管是不是一次可理解的修改：KiCad 文件增删行合计 ≤ 8000、改动文件 ≤ 40；一次小布局改动就改写上千行，阈值故意放宽"/]:::note
+        N4d[/"修改筛，管前后状态能否对上：所有 KiCad 文件状态为 modified；新增无前状态，改名 / 删除对不上文件"/]:::note
+        N4e[/"存盘筛，管是不是真改了电路：逐行差异里 uuid / tstamp / version / generator 行不算，其余真实改动行 ≥ 5；无逐行差异的记 C 级待定（GitHub 对过大文件不返回 patch）"/]:::note
+        N4f[/"限额筛，管少数仓库垄断：每仓库最多 20 条，先取有 issue 关联的，再按说明长度"/]:::note
+
+        P1[目录内 16372]:::keep
+        P2[已合并 14200]:::keep
+        P3[改了 .kicad_pcb 12152<br/>= 8719 个 PR，3022 仓库]:::keep
+        P4[文字合格 3534]:::keep
+        P5[规模合格 1066]:::keep
+        P6[全为修改 855]:::keep
+        P7[有逐行差异 511]:::keep
+        P8[真实改动 328]:::keep
+        P9[限额后 283]:::keep
+        PX1([目录外 17472]):::exit
+        PX2([未合并 2172]):::exit
+        PX3([只改 sch / pro 2048]):::exit
+        PX4([太短 / 模板 / 纯编号 8618]):::exit
+        PX5([改动过大 2468]):::exit
+        PX6([含新增 / 改名 / 删除 211]):::exit
+        PX7([无 patch 344，C 级]):::exit
+        PX8([只存盘 churn 183]):::exit
+        PX9([超限额 45]):::exit
+
+        M3[改了 .kicad_pcb 275885<br/>= 237928 个 commit，31972 仓库]:::keep
+        M4[文字合格 23086]:::keep
+        M5[规模合格 10456]:::keep
+        M6[全为修改 8444]:::keep
+        M7[有逐行差异 4398]:::keep
+        M8[真实改动 3957]:::keep
+        M9[限额后 3416]:::keep
+        MX3([只改 sch / pro 或无 KiCad 文件 214179]):::exit
+        MX4([只有一行标题等 252799]):::exit
+        MX5([改动过大 12630]):::exit
+        MX6([含新增 / 改名 / 删除 2012]):::exit
+        MX7([无 patch 4046，C 级]):::exit
+        MX8([只存盘 churn 441]):::exit
+        MX9([超限额 541]):::exit
+
+        N4a -.- P3
+        N4a -.- M3
+        N4b -.- P4
+        N4b -.- M4
+        N4c -.- P5
+        N4c -.- M5
+        N4d -.- P6
+        N4d -.- M6
+        N4e -.- P7
+        N4e -.- M7
+        N4f -.- P9
+        N4f -.- M9
+
+        P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> P7 --> P8 --> P9
+        P1 -.-> PX2
+        P2 -.-> PX3
+        P3 -.-> PX4
+        P4 -.-> PX5
+        P5 -.-> PX6
+        P6 -.-> PX7
+        P7 -.-> PX8
+        P8 -.-> PX9
+        M3 --> M4 --> M5 --> M6 --> M7 --> M8 --> M9
+        M3 -.-> MX4
+        M4 -.-> MX5
+        M5 -.-> MX6
+        M6 -.-> MX7
+        M7 -.-> MX8
+        M8 -.-> MX9
+    end
+    P --> P1
+    P -.-> PX1
+    M --> M3
+    M -.-> MX3
+
+    subgraph S5[⑤ 出口]
+        direction TB
+        N5[/"A 级：全部通过且说明文字引用了本仓库 issue，题面最完整<br/>B 级：全部通过<br/>C 级：文字 / 规模 / 修改通过，但无逐行差异，待取完整文件判断<br/>issue 口径：GitHub 把 PR 也算 issue，本报告的 97849 已去掉 PR"/]:::note
+        F[最终池 3699 事件<br/>1441 仓库 = PR 283 + commit 3416]:::final
+        G[A 级 200 事件，57 仓库]:::final
+        FB([B 级 3499]):::exit
+        N5 -.- F
+        F --> G
+        F -.-> FB
+    end
+    P9 --> F
     M9 --> F
-    F --> G[A 级 200<br/>关联 issue]
-    F -.-> FX([B 级 3499])
 ```
 
 
