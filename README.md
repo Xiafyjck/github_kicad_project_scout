@@ -127,7 +127,7 @@ The script that packs and uploads the caches is not part of this repo.
 ### Fetching
 
 - [x] File trees for the first candidate set (39902 repos, 21 truncated and ignored)
-- [x] Repo activity stats via GraphQL (39895 fetched, 7 not found)
+- [x] Repo activity stats incl. stars for all 69181 candidates (69170 fetched, 11 not found, 2769 GraphQL queries; 1.22M stars total, 35570 repos with >= 1 star, 150 with >= 1000)
 - [x] Commits, PRs, PR files, issues for every candidate repo (321k requests, 964k commits, 140k PRs, 3.45M PR files, 238k issues)
 - [x] Changed files of every commit in a project dir (423293 commits, 8.87M files)
 - [ ] Run stages 03 to 09 on the 29279 repos added by the other three suffix searches (trees, stats, history, commit files), then rebuild stage 08
